@@ -304,7 +304,7 @@ Node 源码测试通过开发依赖 `tsx` 加载 TypeScript；消费者运行构
 
 源码与构建脚本使用 TypeScript，逐文件职责和架构建议见 [ARCHITECTURE.md](ARCHITECTURE.md)。`npm run typecheck` 使用 `tsc --noEmit` 检查类型；`npm run build` 先检查类型，再使用项目固定版本的 Bun，将 CLI、OpenTUI 和 DSH bridge 分别转译并打包到 `dist/sayrun.js`、`dist/ui-opentui.js`、`dist/command-opentui.js` 和 `dist/terminal-tool.js`，执行语法压缩、空白压缩和标识符改名（minify / uglify），不生成 source map。OpenTUI 保留独立模块，非 TTY 管理命令和纯文本模式不会提前加载 Bun FFI；交互终端的管理命令由 Bun 运行共用 OpenTUI 展示层。zsh 集成作为必要的运行资产生成，去除注释并引用构建后的 CLI。构建失败保留上一次成功产物。
 
-`prepack` 和 `prepublishOnly` 都调用构建，分别覆盖 `npm pack` 和 `npm publish`。发布白名单仅声明 `dist/`；npm 还会自动包含根目录 `README.md` 和必需的 `package.json`。`.npmignore` 显式排除 `src/`、`docs/`、`bin/`、`shell/`、构建脚本、测试和 TypeScript 配置；README 位于仓库根目录，详细文档和预览图片保存在 `docs/`。`dist/` 不提交到 Git，消费者安装 tarball 不需要源码或执行构建。
+`prepack` 和 `prepublishOnly` 都调用构建，分别覆盖 `npm pack` 和 `npm publish`。发布白名单包含 `dist/` 和 README 使用的 `docs/images/approval-preview.png`；npm 还会自动包含根目录 `README.md` 和必需的 `package.json`。README 通过公共 npm CDN 加载这张 PNG，不依赖 GitHub 仓库是否公开。其余详细文档、SVG、源码、构建脚本、测试和 TypeScript 配置不进入安装包。`dist/` 不提交到 Git，消费者安装 tarball 不需要源码或执行构建。
 
 ```zsh
 npm run build
@@ -315,3 +315,12 @@ npm pack
 ```
 
 npm 包名为 `sayrun-shell`，CLI 名称仍为 `sayrun`。`publishConfig` 固定发布到官方 registry，并将访问级别设为 public。手动发布可执行 `npm publish --access=public --registry=https://registry.npmjs.org/`。
+
+`npm publish` 返回成功或 `202 Accepted` 只表示上传已被接收。npm 会在版本公开前扫描，期间可能提示 `Your package is being processed`。发布后应查询官方 registry，确认目标版本及 `latest` 标签都已生效：
+
+```zsh
+npm view sayrun-shell@0.1.2 version --registry=https://registry.npmjs.org/
+npm view sayrun-shell dist-tags --json --registry=https://registry.npmjs.org/
+```
+
+将示例中的版本号替换为本次目标版本。如果持续查不到版本，请登录 npm 维护者账号检查发布状态和通知；公开接口的 404 无法区分等待扫描、人工复核与拦截。README 的图片修复也要随新版本成功发布后，才会在 npm 和公共 CDN 生效。

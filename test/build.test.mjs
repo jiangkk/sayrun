@@ -33,6 +33,30 @@ test('release contains minified standalone assets without source maps, original 
   assert.ok(!(await readFile(entrypoint, 'utf8')).includes('from"@opentui/core"'));
 });
 
+test('published README images use public npm CDN URLs and are included in the tarball', async (t) => {
+  const temp = await mkdtemp(join(tmpdir(), 'sayrun-pack-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const packed = spawnSync('npm', ['pack', '--dry-run', '--ignore-scripts', '--json', '--cache', temp], {
+    cwd: packageRoot, encoding: 'utf8', timeout: 15000,
+  });
+  assert.equal(packed.status, 0, packed.stderr);
+  const files = JSON.parse(packed.stdout)[0].files.map((file) => file.path);
+  const { name } = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
+  const readme = await readFile(join(packageRoot, 'README.md'), 'utf8');
+  const images = [...readme.matchAll(/!\[[^\]]*\]\(([^\s)]+)\)/g)];
+  assert.ok(images.length > 0);
+  for (const [, src] of images) {
+    const url = new URL(src);
+    assert.equal(url.origin, 'https://cdn.jsdelivr.net');
+    const prefix = `/npm/${name}@latest/`;
+    assert.ok(url.pathname.startsWith(prefix));
+    const asset = url.pathname.slice(prefix.length);
+    assert.ok(files.includes(asset), `README image missing from npm package: ${asset}`);
+    assert.equal((await readFile(join(packageRoot, asset))).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  }
+  assert.deepEqual(files.filter((path) => path.startsWith('docs/')), ['docs/images/approval-preview.png']);
+});
+
 test('built DSH plugin preserves the public exports and registers both host tools', async () => {
   const { apply, inject, name } = await import('../dist/terminal-tool.js');
   assert.equal(name, 'sayrun-bridge'); assert.deepEqual(inject, ['tools']);

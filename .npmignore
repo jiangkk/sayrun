@@ -6,7 +6,8 @@ shell/
 test/
 tsconfig.json
 
-# Detailed documentation stays in the repository; npm includes the root README
+# Detailed docs stay in the repository. package.json explicitly includes the
+# README preview PNG so public npm CDNs can serve it without GitHub access.
 docs/
 
 # Local state and build intermediates

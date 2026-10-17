@@ -118,7 +118,8 @@ with tempfile.TemporaryDirectory(prefix="ta-npm-") as temp:
     assert packed["name"] == "sayrun-shell"
     paths = {entry["path"] for entry in packed["files"]}
     assert {"dist/sayrun.js", "dist/ui-opentui.js", "dist/command-opentui.js", "dist/terminal-tool.js", "dist/sayrun.zsh"} <= paths
-    assert not any(path.startswith(("src/", "bin/", "shell/", "dsh/", "scripts/", "test/", "docs/", ".runtime/", "node_modules/", ".git/")) or ".credentials" in path or path == ".env" for path in paths)
+    assert {path for path in paths if path.startswith("docs/")} == {"docs/images/approval-preview.png"}
+    assert not any(path.startswith(("src/", "bin/", "shell/", "dsh/", "scripts/", "test/", ".runtime/", "node_modules/", ".git/")) or ".credentials" in path or path == ".env" for path in paths)
     assert not any(path.endswith((".map", ".ts")) for path in paths), "release must not contain source maps or TypeScript sources"
     command = ["npm", "install", "--global", str(temp / packed["filename"]), "--prefix", str(prefix),
                "--cache", CACHE, "--registry", "https://registry.npmjs.org", "--no-audit", "--no-fund", "--fetch-retries=0", "--fetch-timeout=30000"]
