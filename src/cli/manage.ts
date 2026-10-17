@@ -19,9 +19,20 @@ import { doctor } from './commands/doctor.ts';
 
 export async function manage(mode: string, argv: string[]) {
   if (mode === 'setup') {
-    const { opts, args } = options(argv, { values: ['zshrc', 'backend'], flags: ['yes', 'dry-run', 'temporary'] }); arity(args, 0);
+    const { opts, args } = options(argv, { values: ['zshrc', 'backend'], flags: ['yes', 'dry-run', 'temporary', 'no-shell'] }); arity(args, 0);
     const result = await setup({ yes: opts.yes, dryRun: opts['dry-run'], zshrc: opts.zshrc, backend: opts.backend, temporary: opts.temporary });
-    if (result.applied) return doctor(); return 0;
+    if (!result.applied) return opts['dry-run'] ? 0 : 130;
+    const status = await doctor();
+    if (process.env.TERMINAL_AGENT_SETUP_WRAPPER === '1' && !opts['no-shell']) return status;
+    if (process.stdin.isTTY && process.stdout.isTTY && !opts['no-shell'] && !opts.temporary && !opts.zshrc) {
+      write('配置完成，正在进入已启用 Sayrun 的新 zsh；可直接输入自然语言。exit 返回原终端。\n');
+      const shell = spawnSync('zsh', ['-i'], { stdio: 'inherit' });
+      if (shell.error) throw invalid(`无法启动 zsh：${shell.error.message}。请执行 eval "$(sayrun shell init zsh)"`);
+      return shell.status ?? 1;
+    }
+    write(opts.temporary ? '临时配置完成，未写入 zsh 启动文件。\n' : opts.zshrc ? '配置已写入指定的 zshrc。\n' : '配置完成，新开的 zsh 会自动加载集成。\n');
+    write('当前终端立即启用：eval "$(sayrun shell init zsh)"\n');
+    return status;
   }
   if (mode === 'doctor') { const { opts, args } = options(argv, { flags: ['live', 'json'] }); arity(args, 0); return doctor({ live: opts.live, json: opts.json }); }
   if (mode === 'shell') {
