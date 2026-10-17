@@ -55,7 +55,7 @@ Sayrun 复用 DSH 已配置的凭证，无需重复配置 API Key。安装完成
 sayrun setup
 ```
 
-`setup` 会展示修改计划，经确认后备份 zsh 配置文件，并写入终端集成。首次在交互式终端运行时，会自动进入已启用 Sayrun 的新 zsh，随后即可直接输入自然语言；`exit` 返回原终端。已经加载集成的终端运行 `setup` 会直接刷新当前集成。
+`setup` 使用 OpenTUI 展示 Sayrun 字标、安装预览和确认选项，经确认后备份 zsh 配置文件，并写入终端集成。首次在交互式终端运行时，会自动进入已启用 Sayrun 的新 zsh，随后即可直接输入自然语言；`exit` 返回原终端。已经加载集成的终端运行 `setup` 会直接刷新当前集成。
 
 脚本调用或使用 `--no-shell`、`--temporary`、`--zshrc` 时不会自动启动新 shell。也可以手动在当前交互式 zsh 中启用：
 
@@ -136,7 +136,7 @@ sayrun sessions export <会话ID> --format markdown --output /tmp/task.md
 
 ```zsh
 sayrun config show --effective       # 查看实际配置及来源
-sayrun config set ui.mode plain      # 使用纯文本界面
+sayrun config set ui.mode plain      # 所有命令使用纯文本界面
 sayrun config set ui.mode opentui    # 切回 OpenTUI
 sayrun config set agent.max_commands 10
 sayrun config set execution.timeout_seconds 60
@@ -153,6 +153,8 @@ sayrun backend check dsh
 npm 安装提供命令行程序；直接输入自然语言需要 zsh 已加载终端集成。执行 `sayrun setup`，确认后会自动进入已启用的新 zsh；已加载集成时则刷新当前终端。通过 `sayrun shell status` 可以查看状态。使用 `--no-shell` 仅完成配置后，可打开新的 zsh 终端，或执行上面的 `shell init zsh` 命令立即启用。
 
 `postinstall` 无法修改安装命令所在父 shell 的回车处理，因此自动配置和启用由 `sayrun setup` 完成。
+
+管理命令共用 OpenTUI 的配色和展示方式：`doctor` 显示检查清单，配置、认证、后端和历史显示分组结果；`sessions` 支持方向键选择任务。默认输出面向阅读，显式 `--json`、历史导出和 `shell init zsh` 保留原始输出。窄终端会自动换行和收起大字标，`NO_COLOR` 禁用强调色，非 TTY、`TERM=dumb` 或 `ui.mode=plain` 使用纯文本。可以先运行 `sayrun setup --dry-run` 查看安装界面。
 
 如果手动关闭过，可用 `sayrun shell on` 开启；如果配置过仅显式触发模式，使用 `sayrun config set routing.mode auto` 恢复自动识别。未加载终端集成时，也可以通过 `sayrun ask "任务"` 使用。
 

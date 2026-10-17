@@ -13,6 +13,7 @@ try {
   for (const [entrypoint, target] of [
     ['bin/sayrun.ts', 'node'],
     ['src/terminal/ui-opentui.ts', 'bun'],
+    ['src/terminal/command-opentui.ts', 'bun'],
     ['src/backends/dsh/terminal-tool.ts', 'node'],
   ] as const) {
     const result = await Bun.build({

@@ -21,7 +21,7 @@
   "scripts": {
     "test": "node --import tsx --test test/*.test.mjs && bun test test/ui.test.ts",
     "preview": "node dist/sayrun.js preview",
-    "test:pty": "python3 test/terminal-pty.py && python3 test/history-pty.py",
+    "test:pty": "python3 test/terminal-pty.py && python3 test/history-pty.py && python3 test/commands-pty.py",
     "doctor": "node dist/sayrun.js doctor",
     "test:package": "python3 test/package-install.py",
     "build": "npm run typecheck && bun scripts/build.ts",

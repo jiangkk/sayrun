@@ -6,10 +6,8 @@ import { safeText } from './display.ts';
 import { hostname } from 'node:os';
 import { StepTranscript } from './transcript.ts';
 
-const C = {
-  bg: '#12161d', panel: '#191f29', edge: '#344152', text: '#e3e9f2',
-  muted: '#90a0b5', accent: '#82c9c1', amber: '#edc77b', red: '#f08c91', green: '#9cd5ac',
-};
+import { palette as C, terminalPalette } from './theme.ts';
+
 const frames = ['◐', '◓', '◑', '◒'];
 const approvalActions: ('approve' | 'reject' | 'edit')[] = ['approve', 'reject', 'edit'];
 const editorKeyBindings: NonNullable<ConstructorParameters<typeof TextareaRenderable>[1]['keyBindings']> = [
@@ -71,7 +69,7 @@ export class OpenTuiUi implements TerminalUi {
   timer?: ReturnType<typeof setInterval>;
   constructor(renderer: CliRenderer, { prompt, cwd, output = process.stdout, onCancel = () => {}, signal, animate = true, uiConfig = {}, approvalConfig = {}, backendName = 'agent' }: Omit<UiOptions, 'input'>) {
     this.renderer = renderer;
-    this.colors = uiConfig.color === 'never' || process.env.NO_COLOR !== undefined || process.env.TERM === 'dumb' ? { ...C, accent: '#ffffff', green: '#ffffff', red: '#ffffff', amber: '#ffffff', muted: '#aaaaaa' } : C;
+    this.colors = terminalPalette(uiConfig.color === 'never');
     this.approvalConfig = approvalConfig;
     this.outputStream = output;
     this.transcript = new StepTranscript({ get columns() { return renderer.width; } }, {
