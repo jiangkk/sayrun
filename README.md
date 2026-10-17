@@ -42,10 +42,10 @@ Bun 和 OpenTUI 由 npm 依赖安装，无需额外全局安装 Bun。日常使�
 通过 npm 全局安装：
 
 ```zsh
-npm install -g sayrun
+npm install -g sayrun-shell
 ```
 
-安装包包含构建后的 JavaScript，无需下载源码或手动构建。
+npm 包名为 `sayrun-shell`，安装后的终端命令为 `sayrun`。安装包包含构建后的 JavaScript，无需下载源码或手动构建。
 
 ### 启用终端集成
 
@@ -169,7 +169,7 @@ Node.js 运行命令行入口，npm 安装的 Bun 运行 OpenTUI 界面，DSH �
 ```zsh
 sayrun shell uninstall --dry-run
 sayrun shell uninstall
-npm uninstall -g sayrun
+npm uninstall -g sayrun-shell
 ```
 
 卸载集成会备份 zsh 配置并移除标记区块，已有配置和历史保留。

@@ -1,5 +1,5 @@
 {
-  "name": "sayrun",
+  "name": "sayrun-shell",
   "version": "0.1.0",
   "type": "module",
   "description": "Interactive terminal agent and zsh integration powered by your installed DSH",
@@ -49,5 +49,9 @@
     "@types/node": "22.20.5",
     "tsx": "4.23.15",
     "typescript": "5.9.3"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   }
 }
