@@ -252,11 +252,22 @@ test('setup CLI applies idempotently, uninstalls its block, and shell wrapper to
   const s = await sandbox(t), zshrc = join(s.dir, 'zshrc'); await writeFile(zshrc, '# original\n');
   const before = await readFile(zshrc, 'utf8'); assert.equal(cli(s, 'setup', '--dry-run', '--zshrc', zshrc).status, 0); assert.equal(await readFile(zshrc, 'utf8'), before);
   const first = cli(s, 'setup', '--yes', '--zshrc', zshrc); assert.equal(first.status, 0, first.stdout);
+  assert.match(first.stdout, /当前终端立即启用：eval/);
   const once = await readFile(zshrc, 'utf8'); const second = cli(s, 'setup', '--yes', '--zshrc', zshrc); assert.equal(second.status, 0, second.stdout); assert.equal(await readFile(zshrc, 'utf8'), once);
   assert.equal(cli(s, 'shell', 'uninstall', '--yes', '--zshrc', zshrc).status, 0); assert.equal(await readFile(zshrc, 'utf8'), before);
   const source = new URL('../shell/sayrun.zsh', import.meta.url).pathname;
   const toggle = spawnSync('/bin/zsh', ['-f', '-i', '-c', 'source "$1" >/dev/null; ta shell off; ta shell status; sayrun shell on; sayrun shell status', 'test', source], { env: { ...process.env, ...s.env }, encoding: 'utf8' });
   assert.equal(toggle.status, 0, toggle.stderr); assert.match(toggle.stdout, /enabled=0/); assert.match(toggle.stdout, /enabled=1/);
+  const refresh = spawnSync('/bin/zsh', ['-f', '-i', '-c', `source "$1" >/dev/null
+    sayrun shell off
+    sayrun setup --yes --dry-run --zshrc "$2" >/dev/null
+    sayrun shell status
+    sayrun setup --yes --no-shell --zshrc "$2" >/dev/null
+    sayrun shell status
+    ta setup --yes --zshrc "$2" >/dev/null
+    sayrun shell status`, 'test', source, zshrc], { env: { ...process.env, ...s.env, TERMINAL_AGENT_DSH_BIN: new URL('./fixture-dsh.mjs', import.meta.url).pathname }, cwd: s.cwd, encoding: 'utf8' });
+  assert.equal(refresh.status, 0, refresh.stderr + refresh.stdout);
+  assert.deepEqual([...refresh.stdout.matchAll(/enabled=(\d)/g)].map((match) => match[1]), ['0', '0', '1']);
 });
 
 test('native resume rejects old tool request IDs without replaying their side effects', async (t) => {

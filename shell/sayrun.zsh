@@ -110,6 +110,7 @@ function terminal-agent-off() { sayrun-off; }
 # when sourcing again, including after an npm upgrade at a new package path.
 if [[ "${functions[ta]-}" == *TERMINAL_AGENT_ROOT* ]] || ! whence -w ta >/dev/null 2>&1; then
   function ta() {
+    if [[ "$1" == setup ]]; then sayrun "$@"; return $?; fi
     if [[ "$1" == shell && "$#" == 2 ]]; then
       case "$2" in
         off) sayrun-off; return ;;
@@ -124,6 +125,20 @@ else
 fi
 
 function sayrun() {
+  if [[ "$1" == setup ]]; then
+    local arg skip_reload=0 setup_status
+    for arg in "${@:2}"; do
+      [[ "$arg" == --dry-run || "$arg" == --no-shell ]] && skip_reload=1
+    done
+    TERMINAL_AGENT_SETUP_WRAPPER=1 "$TERMINAL_AGENT_NODE" "$TERMINAL_AGENT_ROOT/dist/sayrun.js" "$@"
+    setup_status=$?
+    # doctor may report unavailable credentials/backend after a successful setup.
+    # A declined setup returns 130 and must not re-enable a disabled integration.
+    if (( ! skip_reload && (setup_status == 0 || setup_status == 5) )); then
+      source "$TERMINAL_AGENT_ROOT/dist/sayrun.zsh"
+    fi
+    return $setup_status
+  fi
   if [[ "$1" == shell && "$#" == 2 ]]; then
     case "$2" in
       off) sayrun-off; return ;;
