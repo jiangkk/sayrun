@@ -20,7 +20,7 @@ import termios
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
-CACHE = os.environ.get("TERMINAL_AGENT_PACKAGE_TEST_CACHE", "/tmp/terminal-agent-npm-cache")
+CACHE = os.environ.get("TERMINAL_AGENT_PACKAGE_TEST_CACHE", "/tmp/sayrun-npm-cache")
 
 
 def run(argv, **kwargs):
@@ -88,12 +88,12 @@ class Terminal:
 def task_case(cli, cwd, env, ui, cancel=None):
     term = Terminal([str(cli)], cwd, dict(env, TERMINAL_AGENT_UI=ui))
     try:
-        term.until("terminal-agent> ")
+        term.until("sayrun> ")
         if cancel:
             term.send(cancel)
         else:
             term.send("\r")  # Empty input must not launch the backend.
-            term.until("terminal-agent> ")
+            term.until("sayrun> ")
             term.send("帮我验证全局安装\r")
             term.until("执行？[Y/n/q]" if ui == "plain" else "FIRST_STEP")
             term.send("y\r" if ui == "plain" else "y")
@@ -115,8 +115,9 @@ with tempfile.TemporaryDirectory(prefix="ta-npm-") as temp:
     # npm pack must create a fresh release via prepack, without prior dist files.
     shutil.rmtree(ROOT / "dist", ignore_errors=True)
     packed = json.loads(run(["npm", "pack", "--silent", "--json", "--pack-destination", str(temp), "--cache", CACHE], cwd=ROOT))[0]
+    assert packed["name"] == "sayrun"
     paths = {entry["path"] for entry in packed["files"]}
-    assert {"dist/terminal-agent.mjs", "dist/ui-opentui.mjs", "dist/terminal-tool.mjs", "dist/terminal-agent.zsh"} <= paths
+    assert {"dist/sayrun.js", "dist/ui-opentui.js", "dist/terminal-tool.js", "dist/sayrun.zsh"} <= paths
     assert not any(path.startswith(("src/", "bin/", "shell/", "dsh/", "scripts/", "test/", "docs/", ".runtime/", "node_modules/", ".git/")) or ".credentials" in path or path == ".env" for path in paths)
     assert not any(path.endswith((".map", ".ts")) for path in paths), "release must not contain source maps or TypeScript sources"
     command = ["npm", "install", "--global", str(temp / packed["filename"]), "--prefix", str(prefix),
@@ -128,8 +129,10 @@ with tempfile.TemporaryDirectory(prefix="ta-npm-") as temp:
     except subprocess.CalledProcessError as error:
         raise RuntimeError(error.stderr) from error
     print("PASS: tarball allowlist and isolated npm install --global", flush=True)
-    package = prefix / "lib/node_modules/terminal-agent"
-    cli = prefix / "bin/terminal-agent"
+    package = prefix / "lib/node_modules/sayrun"
+    cli = prefix / "bin/sayrun"
+    assert cli.exists()
+    assert not (prefix / "bin/terminal-agent").exists(), "Sayrun must not claim another npm package's command"
     fixture_bin = temp / "fixture-bin"
     fixture_bin.mkdir()
     shutil.copy2(ROOT / "test/fixture-dsh.mjs", fixture_bin / "dsh")
@@ -165,8 +168,8 @@ with tempfile.TemporaryDirectory(prefix="ta-npm-") as temp:
         assert not (package / ".runtime").exists()
         term = Terminal(["/bin/zsh", "-f", "-i"], cwd, dict(env, TERMINAL_AGENT_UI="plain"))
         try:
-            term.send("PS1='INSTALL_PROMPT> '; eval \"$(terminal-agent shell init zsh)\"\r")
-            term.until("terminal-agent 已启用")
+            term.send("PS1='INSTALL_PROMPT> '; eval \"$(sayrun shell init zsh)\"\r")
+            term.until("sayrun 已启用")
             term.until("INSTALL_PROMPT> ")
             term.send("ta --version\r")
             term.until(packed["version"])
@@ -176,8 +179,8 @@ with tempfile.TemporaryDirectory(prefix="ta-npm-") as temp:
             term.send("n\r")
             term.until("已拒绝，命令未执行")
             term.until("INSTALL_PROMPT> ")
-            term.send("terminal-agent-off\r")
-            term.until("terminal-agent 已关闭")
+            term.send("sayrun-off\r")
+            term.until("sayrun 已关闭")
             term.until("INSTALL_PROMPT> ")
             term.send("exit\r")
             term.exited()

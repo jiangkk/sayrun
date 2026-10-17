@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import stringWidth from 'string-width';
-import { formatConclusion, renderMarkdown, StepTranscript } from '../src/transcript.mjs';
-import { safeText } from '../src/display.mjs';
+import { formatConclusion, renderMarkdown, StepTranscript } from '../src/terminal/transcript.ts';
+import { safeText } from '../src/terminal/display.ts';
 
 test('final answers render Markdown with emphasis and preserve all content at narrow widths', () => {
   const text = '**该域名暂时无法解析。**\n\n### 关键证据\n- 本地 DNS 返回 `NXDOMAIN`。\n- 公共 DNS 没有返回 A 记录。\n\n```sh\nnslookup oneui-view-bridge.uat.ennew.com\n```\n\n' + '完整结论'.repeat(1200) + 'END_OF_ANSWER';

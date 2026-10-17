@@ -4,18 +4,19 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { normalizeCommand, runCommand } from '../src/execute.mjs';
-import { LineRpc } from '../src/rpc.mjs';
-import { prepareDsh, projectRoot } from '../src/dsh.mjs';
-import { safeText } from '../src/display.mjs';
-import { parseClassification, classifyInput } from '../src/classify.mjs';
-import { ActiveBudget } from '../src/budget.mjs';
+import { normalizeCommand, runCommand } from '../src/execution/process-runner.ts';
+import { LineRpc } from '../src/backends/dsh/rpc.ts';
+import { prepareDsh, projectRoot } from '../src/backends/dsh/composition.ts';
+import { safeText } from '../src/terminal/display.ts';
+import { parseClassification } from '../src/backends/classification.ts';
+import { classifyInput } from '../src/application/classify-input.ts';
+import { ActiveBudget } from '../src/application/active-budget.ts';
 
 test('execution pins cwd, reports failure and withholds credentials from shell', async () => {
   const proposal = await normalizeCommand({ command: 'printf "%s\\n" "$PWD" "${DEEPSEEK_API_KEY-unset}"; exit 7', description: 'test' }, projectRoot);
   const result = await runCommand(proposal, { env: { ...process.env, DEEPSEEK_API_KEY: 'never-print-this' } });
   assert.equal(result.exitCode, 7);
-  assert.match(result.output, /terminal-agent\nunset/);
+  assert.equal(result.output, `${projectRoot.replace(/\/$/, '')}\nunset\n`);
   assert.ok(Object.isFrozen(proposal));
 });
 
@@ -43,7 +44,7 @@ test('invalid cwd/control characters are rejected and output is bounded', async 
 
 test('JSON-RPC correlates concurrent requests and propagates process exit', async () => {
   const child = spawn(process.execPath, ['--input-type=module', '-e', `
-    import {createInterface} from 'node:readline';
+    import { createInterface } from 'node:readline';
     const rl = createInterface({input:process.stdin});
     rl.on('line', line => { const m=JSON.parse(line); if(m.method==='exit')process.exit(1);
       setTimeout(()=>console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result:m.params})),m.params.delay); });
@@ -64,7 +65,7 @@ test('DSH composition exposes only the approval-gated terminal tool', async () =
     assert.ok(patch.find((r) => r.id === 'persistent-bash').disabled);
     assert.ok(patch.find((r) => r.id === 'persistent-pwsh').disabled);
     assert.equal(patch.find((r) => r.insert).insert.length, 1);
-    const { apply } = await import('../dsh/terminal-tool.mjs');
+    const { apply } = await import('../src/backends/dsh/terminal-tool.ts');
     const tools = [];
     apply({ tools: { register: (tool) => tools.push(tool) } });
     assert.deepEqual(tools.map((t) => t.name), ['terminal_command', 'terminal_question']);
@@ -86,7 +87,7 @@ test('zsh routes native syntax, aliases, functions, Chinese args and natural lan
     ['git 帮我撤销上一次提交', 'classify'], ['  git status', 'shell'], ['echo 帮我', 'shell'],
     ['echo "帮我"', 'shell'], ['grep 中文 file.txt', 'shell'],
   ];
-  const script = `source ./shell/terminal-agent.zsh >/dev/null
+  const script = `source ./shell/sayrun.zsh >/dev/null
 alias ll='ls -l'
 myfunc() { :; }
 for line in "$@"; do _terminal_agent_route "$line"; print -r -- "$REPLY"; done`;

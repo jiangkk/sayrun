@@ -1,0 +1,482 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1048" height="563" viewBox="0 0 1048 563" role="img" aria-labelledby="title desc">
+<title id="title">Sayrun 命令审批预览</title>
+<desc id="desc">实际 OpenTUI 渲染画面，使用演示数据，展示命令预览、批准、拒绝和编辑操作。未调用模型或执行命令。</desc>
+<rect width="1048" height="563" rx="14" fill="#12161d"/>
+<path d="M14 0H1034Q1048 0 1048 14V44H0V14Q0 0 14 0" fill="#202733"/>
+<circle cx="24" cy="22" r="5" fill="#f08c91"/><circle cx="42" cy="22" r="5" fill="#edc77b"/><circle cx="60" cy="22" r="5" fill="#9cd5ac"/>
+<text x="524" y="28" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#90a0b5">sayrun · 离线交互预览</text>
+<g font-family="Menlo,Consolas,monospace,'PingFang SC','Microsoft YaHei'" font-size="17" xml:space="preserve">
+<rect x="24" y="64" width="1000" height="25" fill="#12161d"/>
+<rect x="24" y="89" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="89" width="80" height="25" fill="#12161d"/>
+<text x="44" y="108" fill="#82c9c1" font-weight="bold">◆</text>
+<text x="64" y="108" fill="#82c9c1" font-weight="bold">S</text>
+<text x="74" y="108" fill="#82c9c1" font-weight="bold">A</text>
+<text x="84" y="108" fill="#82c9c1" font-weight="bold">Y</text>
+<text x="94" y="108" fill="#82c9c1" font-weight="bold">R</text>
+<text x="104" y="108" fill="#82c9c1" font-weight="bold">U</text>
+<text x="114" y="108" fill="#82c9c1" font-weight="bold">N</text>
+<rect x="124" y="89" width="20" height="25" fill="#12161d"/>
+<rect x="144" y="89" width="120" height="25" fill="#12161d"/>
+<text x="144" y="108" fill="#90a0b5">自</text>
+<text x="164" y="108" fill="#90a0b5">然</text>
+<text x="184" y="108" fill="#90a0b5">语</text>
+<text x="204" y="108" fill="#90a0b5">言</text>
+<text x="224" y="108" fill="#90a0b5">任</text>
+<text x="244" y="108" fill="#90a0b5">务</text>
+<rect x="264" y="89" width="600" height="25" fill="#12161d"/>
+<rect x="864" y="89" width="100" height="25" fill="#12161d"/>
+<text x="864" y="108" fill="#edc77b">●</text>
+<text x="884" y="108" fill="#edc77b">等</text>
+<text x="904" y="108" fill="#edc77b">待</text>
+<text x="924" y="108" fill="#edc77b">审</text>
+<text x="944" y="108" fill="#edc77b">批</text>
+<rect x="964" y="89" width="20" height="25" fill="#12161d"/>
+<rect x="984" y="89" width="20" height="25" fill="#12161d"/>
+<text x="984" y="108" fill="#90a0b5">0</text>
+<text x="994" y="108" fill="#90a0b5">s</text>
+<rect x="1004" y="89" width="20" height="25" fill="#12161d"/>
+<rect x="24" y="114" width="1000" height="25" fill="#12161d"/>
+<rect x="24" y="139" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="139" width="420" height="25" fill="#12161d"/>
+<text x="44" y="158" fill="#e3e9f2">找</text>
+<text x="64" y="158" fill="#e3e9f2">出</text>
+<text x="84" y="158" fill="#e3e9f2">当</text>
+<text x="104" y="158" fill="#e3e9f2">前</text>
+<text x="124" y="158" fill="#e3e9f2">目</text>
+<text x="144" y="158" fill="#e3e9f2">录</text>
+<text x="164" y="158" fill="#e3e9f2">最</text>
+<text x="184" y="158" fill="#e3e9f2">大</text>
+<text x="204" y="158" fill="#e3e9f2">的</text>
+<text x="224" y="158" fill="#e3e9f2">十</text>
+<text x="244" y="158" fill="#e3e9f2">个</text>
+<text x="264" y="158" fill="#e3e9f2">文</text>
+<text x="284" y="158" fill="#e3e9f2">件</text>
+<text x="304" y="158" fill="#e3e9f2">，</text>
+<text x="324" y="158" fill="#e3e9f2">只</text>
+<text x="344" y="158" fill="#e3e9f2">读</text>
+<text x="364" y="158" fill="#e3e9f2">取</text>
+<text x="384" y="158" fill="#e3e9f2">文</text>
+<text x="404" y="158" fill="#e3e9f2">件</text>
+<text x="424" y="158" fill="#e3e9f2">信</text>
+<text x="444" y="158" fill="#e3e9f2">息</text>
+<rect x="464" y="139" width="560" height="25" fill="#12161d"/>
+<rect x="24" y="164" width="1000" height="25" fill="#12161d"/>
+<rect x="24" y="189" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="189" width="260" height="25" fill="#12161d"/>
+<text x="44" y="208" fill="#90a0b5">演</text>
+<text x="64" y="208" fill="#90a0b5">示</text>
+<text x="84" y="208" fill="#90a0b5">主</text>
+<text x="104" y="208" fill="#90a0b5">机</text>
+<text x="134" y="208" fill="#90a0b5">·</text>
+<text x="154" y="208" fill="#90a0b5">/</text>
+<text x="164" y="208" fill="#90a0b5">w</text>
+<text x="174" y="208" fill="#90a0b5">o</text>
+<text x="184" y="208" fill="#90a0b5">r</text>
+<text x="194" y="208" fill="#90a0b5">k</text>
+<text x="204" y="208" fill="#90a0b5">s</text>
+<text x="214" y="208" fill="#90a0b5">p</text>
+<text x="224" y="208" fill="#90a0b5">a</text>
+<text x="234" y="208" fill="#90a0b5">c</text>
+<text x="244" y="208" fill="#90a0b5">e</text>
+<text x="254" y="208" fill="#90a0b5">/</text>
+<text x="264" y="208" fill="#90a0b5">d</text>
+<text x="274" y="208" fill="#90a0b5">e</text>
+<text x="284" y="208" fill="#90a0b5">m</text>
+<text x="294" y="208" fill="#90a0b5">o</text>
+<rect x="304" y="189" width="720" height="25" fill="#12161d"/>
+<rect x="24" y="214" width="1000" height="25" fill="#12161d"/>
+<rect x="24" y="239" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="239" width="410" height="25" fill="#12161d"/>
+<text x="44" y="258" fill="#90a0b5">1</text>
+<text x="54" y="258" fill="#90a0b5">/</text>
+<text x="64" y="258" fill="#90a0b5">8</text>
+<text x="94" y="258" fill="#90a0b5">按</text>
+<text x="114" y="258" fill="#90a0b5">磁</text>
+<text x="134" y="258" fill="#90a0b5">盘</text>
+<text x="154" y="258" fill="#90a0b5">占</text>
+<text x="174" y="258" fill="#90a0b5">用</text>
+<text x="194" y="258" fill="#90a0b5">列</text>
+<text x="214" y="258" fill="#90a0b5">出</text>
+<text x="234" y="258" fill="#90a0b5">最</text>
+<text x="254" y="258" fill="#90a0b5">大</text>
+<text x="274" y="258" fill="#90a0b5">的</text>
+<text x="294" y="258" fill="#90a0b5">十</text>
+<text x="314" y="258" fill="#90a0b5">个</text>
+<text x="334" y="258" fill="#90a0b5">文</text>
+<text x="354" y="258" fill="#90a0b5">件</text>
+<text x="374" y="258" fill="#90a0b5">（</text>
+<text x="394" y="258" fill="#90a0b5">只</text>
+<text x="414" y="258" fill="#90a0b5">读</text>
+<text x="434" y="258" fill="#90a0b5">）</text>
+<rect x="454" y="239" width="570" height="25" fill="#12161d"/>
+<rect x="24" y="264" width="1000" height="25" fill="#12161d"/>
+<rect x="24" y="289" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="289" width="20" height="25" fill="#191f29"/>
+<text x="44" y="308" fill="#edc77b">╭</text>
+<text x="54" y="308" fill="#edc77b">─</text>
+<rect x="64" y="289" width="280" height="25" fill="#191f29"/>
+<text x="74" y="308" fill="#90a0b5">命</text>
+<text x="94" y="308" fill="#90a0b5">令</text>
+<text x="114" y="308" fill="#90a0b5">预</text>
+<text x="134" y="308" fill="#90a0b5">览</text>
+<text x="164" y="308" fill="#90a0b5">·</text>
+<text x="184" y="308" fill="#90a0b5">z</text>
+<text x="194" y="308" fill="#90a0b5">s</text>
+<text x="204" y="308" fill="#90a0b5">h</text>
+<text x="224" y="308" fill="#90a0b5">-</text>
+<text x="234" y="308" fill="#90a0b5">f</text>
+<text x="254" y="308" fill="#90a0b5">·</text>
+<text x="274" y="308" fill="#90a0b5">可</text>
+<text x="294" y="308" fill="#90a0b5">滚</text>
+<text x="314" y="308" fill="#90a0b5">动</text>
+<rect x="344" y="289" width="660" height="25" fill="#191f29"/>
+<text x="344" y="308" fill="#edc77b">─</text>
+<text x="354" y="308" fill="#edc77b">─</text>
+<text x="364" y="308" fill="#edc77b">─</text>
+<text x="374" y="308" fill="#edc77b">─</text>
+<text x="384" y="308" fill="#edc77b">─</text>
+<text x="394" y="308" fill="#edc77b">─</text>
+<text x="404" y="308" fill="#edc77b">─</text>
+<text x="414" y="308" fill="#edc77b">─</text>
+<text x="424" y="308" fill="#edc77b">─</text>
+<text x="434" y="308" fill="#edc77b">─</text>
+<text x="444" y="308" fill="#edc77b">─</text>
+<text x="454" y="308" fill="#edc77b">─</text>
+<text x="464" y="308" fill="#edc77b">─</text>
+<text x="474" y="308" fill="#edc77b">─</text>
+<text x="484" y="308" fill="#edc77b">─</text>
+<text x="494" y="308" fill="#edc77b">─</text>
+<text x="504" y="308" fill="#edc77b">─</text>
+<text x="514" y="308" fill="#edc77b">─</text>
+<text x="524" y="308" fill="#edc77b">─</text>
+<text x="534" y="308" fill="#edc77b">─</text>
+<text x="544" y="308" fill="#edc77b">─</text>
+<text x="554" y="308" fill="#edc77b">─</text>
+<text x="564" y="308" fill="#edc77b">─</text>
+<text x="574" y="308" fill="#edc77b">─</text>
+<text x="584" y="308" fill="#edc77b">─</text>
+<text x="594" y="308" fill="#edc77b">─</text>
+<text x="604" y="308" fill="#edc77b">─</text>
+<text x="614" y="308" fill="#edc77b">─</text>
+<text x="624" y="308" fill="#edc77b">─</text>
+<text x="634" y="308" fill="#edc77b">─</text>
+<text x="644" y="308" fill="#edc77b">─</text>
+<text x="654" y="308" fill="#edc77b">─</text>
+<text x="664" y="308" fill="#edc77b">─</text>
+<text x="674" y="308" fill="#edc77b">─</text>
+<text x="684" y="308" fill="#edc77b">─</text>
+<text x="694" y="308" fill="#edc77b">─</text>
+<text x="704" y="308" fill="#edc77b">─</text>
+<text x="714" y="308" fill="#edc77b">─</text>
+<text x="724" y="308" fill="#edc77b">─</text>
+<text x="734" y="308" fill="#edc77b">─</text>
+<text x="744" y="308" fill="#edc77b">─</text>
+<text x="754" y="308" fill="#edc77b">─</text>
+<text x="764" y="308" fill="#edc77b">─</text>
+<text x="774" y="308" fill="#edc77b">─</text>
+<text x="784" y="308" fill="#edc77b">─</text>
+<text x="794" y="308" fill="#edc77b">─</text>
+<text x="804" y="308" fill="#edc77b">─</text>
+<text x="814" y="308" fill="#edc77b">─</text>
+<text x="824" y="308" fill="#edc77b">─</text>
+<text x="834" y="308" fill="#edc77b">─</text>
+<text x="844" y="308" fill="#edc77b">─</text>
+<text x="854" y="308" fill="#edc77b">─</text>
+<text x="864" y="308" fill="#edc77b">─</text>
+<text x="874" y="308" fill="#edc77b">─</text>
+<text x="884" y="308" fill="#edc77b">─</text>
+<text x="894" y="308" fill="#edc77b">─</text>
+<text x="904" y="308" fill="#edc77b">─</text>
+<text x="914" y="308" fill="#edc77b">─</text>
+<text x="924" y="308" fill="#edc77b">─</text>
+<text x="934" y="308" fill="#edc77b">─</text>
+<text x="944" y="308" fill="#edc77b">─</text>
+<text x="954" y="308" fill="#edc77b">─</text>
+<text x="964" y="308" fill="#edc77b">─</text>
+<text x="974" y="308" fill="#edc77b">─</text>
+<text x="984" y="308" fill="#edc77b">─</text>
+<text x="994" y="308" fill="#edc77b">╮</text>
+<rect x="1004" y="289" width="20" height="25" fill="#12161d"/>
+<rect x="24" y="314" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="314" width="10" height="25" fill="#191f29"/>
+<text x="44" y="333" fill="#edc77b">│</text>
+<rect x="54" y="314" width="10" height="25" fill="#191f29"/>
+<rect x="64" y="314" width="210" height="25" fill="#191f29"/>
+<text x="64" y="333" fill="#e3e9f2">目</text>
+<text x="84" y="333" fill="#e3e9f2">录</text>
+<text x="104" y="333" fill="#e3e9f2">：</text>
+<text x="124" y="333" fill="#e3e9f2">/</text>
+<text x="134" y="333" fill="#e3e9f2">w</text>
+<text x="144" y="333" fill="#e3e9f2">o</text>
+<text x="154" y="333" fill="#e3e9f2">r</text>
+<text x="164" y="333" fill="#e3e9f2">k</text>
+<text x="174" y="333" fill="#e3e9f2">s</text>
+<text x="184" y="333" fill="#e3e9f2">p</text>
+<text x="194" y="333" fill="#e3e9f2">a</text>
+<text x="204" y="333" fill="#e3e9f2">c</text>
+<text x="214" y="333" fill="#e3e9f2">e</text>
+<text x="224" y="333" fill="#e3e9f2">/</text>
+<text x="234" y="333" fill="#e3e9f2">d</text>
+<text x="244" y="333" fill="#e3e9f2">e</text>
+<text x="254" y="333" fill="#e3e9f2">m</text>
+<text x="264" y="333" fill="#e3e9f2">o</text>
+<rect x="274" y="314" width="720" height="25" fill="#191f29"/>
+<rect x="994" y="314" width="10" height="25" fill="#191f29"/>
+<text x="994" y="333" fill="#edc77b">│</text>
+<rect x="1004" y="314" width="20" height="25" fill="#12161d"/>
+<rect x="24" y="339" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="339" width="10" height="25" fill="#191f29"/>
+<text x="44" y="358" fill="#edc77b">│</text>
+<rect x="54" y="339" width="10" height="25" fill="#191f29"/>
+<rect x="64" y="339" width="260" height="25" fill="#191f29"/>
+<text x="64" y="358" fill="#e3e9f2">执</text>
+<text x="84" y="358" fill="#e3e9f2">行</text>
+<text x="104" y="358" fill="#e3e9f2">器</text>
+<text x="124" y="358" fill="#e3e9f2">：</text>
+<text x="144" y="358" fill="#e3e9f2">l</text>
+<text x="154" y="358" fill="#e3e9f2">o</text>
+<text x="164" y="358" fill="#e3e9f2">c</text>
+<text x="174" y="358" fill="#e3e9f2">a</text>
+<text x="184" y="358" fill="#e3e9f2">l</text>
+<text x="194" y="358" fill="#e3e9f2">-</text>
+<text x="204" y="358" fill="#e3e9f2">z</text>
+<text x="214" y="358" fill="#e3e9f2">s</text>
+<text x="224" y="358" fill="#e3e9f2">h</text>
+<text x="244" y="358" fill="#e3e9f2">·</text>
+<text x="264" y="358" fill="#e3e9f2">z</text>
+<text x="274" y="358" fill="#e3e9f2">s</text>
+<text x="284" y="358" fill="#e3e9f2">h</text>
+<text x="304" y="358" fill="#e3e9f2">-</text>
+<text x="314" y="358" fill="#e3e9f2">f</text>
+<rect x="324" y="339" width="670" height="25" fill="#191f29"/>
+<rect x="994" y="339" width="10" height="25" fill="#191f29"/>
+<text x="994" y="358" fill="#edc77b">│</text>
+<rect x="1004" y="339" width="20" height="25" fill="#12161d"/>
+<rect x="24" y="364" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="364" width="10" height="25" fill="#191f29"/>
+<text x="44" y="383" fill="#edc77b">│</text>
+<rect x="54" y="364" width="940" height="25" fill="#191f29"/>
+<rect x="994" y="364" width="10" height="25" fill="#191f29"/>
+<text x="994" y="383" fill="#edc77b">│</text>
+<rect x="1004" y="364" width="20" height="25" fill="#12161d"/>
+<rect x="24" y="389" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="389" width="10" height="25" fill="#191f29"/>
+<text x="44" y="408" fill="#edc77b">│</text>
+<rect x="54" y="389" width="10" height="25" fill="#191f29"/>
+<rect x="64" y="389" width="550" height="25" fill="#191f29"/>
+<text x="64" y="408" fill="#e3e9f2">f</text>
+<text x="74" y="408" fill="#e3e9f2">i</text>
+<text x="84" y="408" fill="#e3e9f2">n</text>
+<text x="94" y="408" fill="#e3e9f2">d</text>
+<text x="114" y="408" fill="#e3e9f2">.</text>
+<text x="134" y="408" fill="#e3e9f2">-</text>
+<text x="144" y="408" fill="#e3e9f2">t</text>
+<text x="154" y="408" fill="#e3e9f2">y</text>
+<text x="164" y="408" fill="#e3e9f2">p</text>
+<text x="174" y="408" fill="#e3e9f2">e</text>
+<text x="194" y="408" fill="#e3e9f2">f</text>
+<text x="214" y="408" fill="#e3e9f2">-</text>
+<text x="224" y="408" fill="#e3e9f2">e</text>
+<text x="234" y="408" fill="#e3e9f2">x</text>
+<text x="244" y="408" fill="#e3e9f2">e</text>
+<text x="254" y="408" fill="#e3e9f2">c</text>
+<text x="274" y="408" fill="#e3e9f2">d</text>
+<text x="284" y="408" fill="#e3e9f2">u</text>
+<text x="304" y="408" fill="#e3e9f2">-</text>
+<text x="314" y="408" fill="#e3e9f2">k</text>
+<text x="334" y="408" fill="#e3e9f2">{</text>
+<text x="344" y="408" fill="#e3e9f2">}</text>
+<text x="364" y="408" fill="#e3e9f2">+</text>
+<text x="384" y="408" fill="#e3e9f2">|</text>
+<text x="404" y="408" fill="#e3e9f2">s</text>
+<text x="414" y="408" fill="#e3e9f2">o</text>
+<text x="424" y="408" fill="#e3e9f2">r</text>
+<text x="434" y="408" fill="#e3e9f2">t</text>
+<text x="454" y="408" fill="#e3e9f2">-</text>
+<text x="464" y="408" fill="#e3e9f2">r</text>
+<text x="474" y="408" fill="#e3e9f2">n</text>
+<text x="494" y="408" fill="#e3e9f2">|</text>
+<text x="514" y="408" fill="#e3e9f2">h</text>
+<text x="524" y="408" fill="#e3e9f2">e</text>
+<text x="534" y="408" fill="#e3e9f2">a</text>
+<text x="544" y="408" fill="#e3e9f2">d</text>
+<text x="564" y="408" fill="#e3e9f2">-</text>
+<text x="574" y="408" fill="#e3e9f2">n</text>
+<text x="594" y="408" fill="#e3e9f2">1</text>
+<text x="604" y="408" fill="#e3e9f2">0</text>
+<rect x="614" y="389" width="380" height="25" fill="#191f29"/>
+<rect x="994" y="389" width="10" height="25" fill="#191f29"/>
+<text x="994" y="408" fill="#edc77b">│</text>
+<rect x="1004" y="389" width="20" height="25" fill="#12161d"/>
+<rect x="24" y="414" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="414" width="960" height="25" fill="#191f29"/>
+<text x="44" y="433" fill="#edc77b">╰</text>
+<text x="54" y="433" fill="#edc77b">─</text>
+<text x="64" y="433" fill="#edc77b">─</text>
+<text x="74" y="433" fill="#edc77b">─</text>
+<text x="84" y="433" fill="#edc77b">─</text>
+<text x="94" y="433" fill="#edc77b">─</text>
+<text x="104" y="433" fill="#edc77b">─</text>
+<text x="114" y="433" fill="#edc77b">─</text>
+<text x="124" y="433" fill="#edc77b">─</text>
+<text x="134" y="433" fill="#edc77b">─</text>
+<text x="144" y="433" fill="#edc77b">─</text>
+<text x="154" y="433" fill="#edc77b">─</text>
+<text x="164" y="433" fill="#edc77b">─</text>
+<text x="174" y="433" fill="#edc77b">─</text>
+<text x="184" y="433" fill="#edc77b">─</text>
+<text x="194" y="433" fill="#edc77b">─</text>
+<text x="204" y="433" fill="#edc77b">─</text>
+<text x="214" y="433" fill="#edc77b">─</text>
+<text x="224" y="433" fill="#edc77b">─</text>
+<text x="234" y="433" fill="#edc77b">─</text>
+<text x="244" y="433" fill="#edc77b">─</text>
+<text x="254" y="433" fill="#edc77b">─</text>
+<text x="264" y="433" fill="#edc77b">─</text>
+<text x="274" y="433" fill="#edc77b">─</text>
+<text x="284" y="433" fill="#edc77b">─</text>
+<text x="294" y="433" fill="#edc77b">─</text>
+<text x="304" y="433" fill="#edc77b">─</text>
+<text x="314" y="433" fill="#edc77b">─</text>
+<text x="324" y="433" fill="#edc77b">─</text>
+<text x="334" y="433" fill="#edc77b">─</text>
+<text x="344" y="433" fill="#edc77b">─</text>
+<text x="354" y="433" fill="#edc77b">─</text>
+<text x="364" y="433" fill="#edc77b">─</text>
+<text x="374" y="433" fill="#edc77b">─</text>
+<text x="384" y="433" fill="#edc77b">─</text>
+<text x="394" y="433" fill="#edc77b">─</text>
+<text x="404" y="433" fill="#edc77b">─</text>
+<text x="414" y="433" fill="#edc77b">─</text>
+<text x="424" y="433" fill="#edc77b">─</text>
+<text x="434" y="433" fill="#edc77b">─</text>
+<text x="444" y="433" fill="#edc77b">─</text>
+<text x="454" y="433" fill="#edc77b">─</text>
+<text x="464" y="433" fill="#edc77b">─</text>
+<text x="474" y="433" fill="#edc77b">─</text>
+<text x="484" y="433" fill="#edc77b">─</text>
+<text x="494" y="433" fill="#edc77b">─</text>
+<text x="504" y="433" fill="#edc77b">─</text>
+<text x="514" y="433" fill="#edc77b">─</text>
+<text x="524" y="433" fill="#edc77b">─</text>
+<text x="534" y="433" fill="#edc77b">─</text>
+<text x="544" y="433" fill="#edc77b">─</text>
+<text x="554" y="433" fill="#edc77b">─</text>
+<text x="564" y="433" fill="#edc77b">─</text>
+<text x="574" y="433" fill="#edc77b">─</text>
+<text x="584" y="433" fill="#edc77b">─</text>
+<text x="594" y="433" fill="#edc77b">─</text>
+<text x="604" y="433" fill="#edc77b">─</text>
+<text x="614" y="433" fill="#edc77b">─</text>
+<text x="624" y="433" fill="#edc77b">─</text>
+<text x="634" y="433" fill="#edc77b">─</text>
+<text x="644" y="433" fill="#edc77b">─</text>
+<text x="654" y="433" fill="#edc77b">─</text>
+<text x="664" y="433" fill="#edc77b">─</text>
+<text x="674" y="433" fill="#edc77b">─</text>
+<text x="684" y="433" fill="#edc77b">─</text>
+<text x="694" y="433" fill="#edc77b">─</text>
+<text x="704" y="433" fill="#edc77b">─</text>
+<text x="714" y="433" fill="#edc77b">─</text>
+<text x="724" y="433" fill="#edc77b">─</text>
+<text x="734" y="433" fill="#edc77b">─</text>
+<text x="744" y="433" fill="#edc77b">─</text>
+<text x="754" y="433" fill="#edc77b">─</text>
+<text x="764" y="433" fill="#edc77b">─</text>
+<text x="774" y="433" fill="#edc77b">─</text>
+<text x="784" y="433" fill="#edc77b">─</text>
+<text x="794" y="433" fill="#edc77b">─</text>
+<text x="804" y="433" fill="#edc77b">─</text>
+<text x="814" y="433" fill="#edc77b">─</text>
+<text x="824" y="433" fill="#edc77b">─</text>
+<text x="834" y="433" fill="#edc77b">─</text>
+<text x="844" y="433" fill="#edc77b">─</text>
+<text x="854" y="433" fill="#edc77b">─</text>
+<text x="864" y="433" fill="#edc77b">─</text>
+<text x="874" y="433" fill="#edc77b">─</text>
+<text x="884" y="433" fill="#edc77b">─</text>
+<text x="894" y="433" fill="#edc77b">─</text>
+<text x="904" y="433" fill="#edc77b">─</text>
+<text x="914" y="433" fill="#edc77b">─</text>
+<text x="924" y="433" fill="#edc77b">─</text>
+<text x="934" y="433" fill="#edc77b">─</text>
+<text x="944" y="433" fill="#edc77b">─</text>
+<text x="954" y="433" fill="#edc77b">─</text>
+<text x="964" y="433" fill="#edc77b">─</text>
+<text x="974" y="433" fill="#edc77b">─</text>
+<text x="984" y="433" fill="#edc77b">─</text>
+<text x="994" y="433" fill="#edc77b">╯</text>
+<rect x="1004" y="414" width="20" height="25" fill="#12161d"/>
+<rect x="24" y="439" width="1000" height="25" fill="#12161d"/>
+<rect x="24" y="464" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="464" width="160" height="25" fill="#9cd5ac"/>
+<text x="54" y="483" fill="#12161d">›</text>
+<text x="74" y="483" fill="#12161d">批</text>
+<text x="94" y="483" fill="#12161d">准</text>
+<text x="114" y="483" fill="#12161d">执</text>
+<text x="134" y="483" fill="#12161d">行</text>
+<text x="164" y="483" fill="#12161d">[</text>
+<text x="174" y="483" fill="#12161d">y</text>
+<text x="184" y="483" fill="#12161d">]</text>
+<rect x="204" y="464" width="20" height="25" fill="#12161d"/>
+<rect x="224" y="464" width="120" height="25" fill="#12161d"/>
+<text x="254" y="483" fill="#90a0b5">拒</text>
+<text x="274" y="483" fill="#90a0b5">绝</text>
+<text x="304" y="483" fill="#90a0b5">[</text>
+<text x="314" y="483" fill="#90a0b5">n</text>
+<text x="324" y="483" fill="#90a0b5">]</text>
+<rect x="344" y="464" width="20" height="25" fill="#12161d"/>
+<rect x="364" y="464" width="160" height="25" fill="#12161d"/>
+<text x="394" y="483" fill="#90a0b5">编</text>
+<text x="414" y="483" fill="#90a0b5">辑</text>
+<text x="434" y="483" fill="#90a0b5">命</text>
+<text x="454" y="483" fill="#90a0b5">令</text>
+<text x="484" y="483" fill="#90a0b5">[</text>
+<text x="494" y="483" fill="#90a0b5">e</text>
+<text x="504" y="483" fill="#90a0b5">]</text>
+<rect x="524" y="464" width="500" height="25" fill="#12161d"/>
+<rect x="24" y="489" width="1000" height="25" fill="#12161d"/>
+<rect x="24" y="514" width="20" height="25" fill="#12161d"/>
+<rect x="44" y="514" width="640" height="25" fill="#12161d"/>
+<text x="44" y="533" fill="#90a0b5">←</text>
+<text x="64" y="533" fill="#90a0b5">→</text>
+<text x="84" y="533" fill="#90a0b5">/</text>
+<text x="104" y="533" fill="#90a0b5">T</text>
+<text x="114" y="533" fill="#90a0b5">a</text>
+<text x="124" y="533" fill="#90a0b5">b</text>
+<text x="144" y="533" fill="#90a0b5">选</text>
+<text x="164" y="533" fill="#90a0b5">择</text>
+<text x="194" y="533" fill="#90a0b5">·</text>
+<text x="214" y="533" fill="#90a0b5">E</text>
+<text x="224" y="533" fill="#90a0b5">n</text>
+<text x="234" y="533" fill="#90a0b5">t</text>
+<text x="244" y="533" fill="#90a0b5">e</text>
+<text x="254" y="533" fill="#90a0b5">r</text>
+<text x="274" y="533" fill="#90a0b5">确</text>
+<text x="294" y="533" fill="#90a0b5">认</text>
+<text x="324" y="533" fill="#90a0b5">·</text>
+<text x="344" y="533" fill="#90a0b5">↑</text>
+<text x="364" y="533" fill="#90a0b5">↓</text>
+<text x="384" y="533" fill="#90a0b5">/</text>
+<text x="404" y="533" fill="#90a0b5">P</text>
+<text x="414" y="533" fill="#90a0b5">g</text>
+<text x="424" y="533" fill="#90a0b5">U</text>
+<text x="434" y="533" fill="#90a0b5">p</text>
+<text x="454" y="533" fill="#90a0b5">P</text>
+<text x="464" y="533" fill="#90a0b5">g</text>
+<text x="474" y="533" fill="#90a0b5">D</text>
+<text x="484" y="533" fill="#90a0b5">n</text>
+<text x="504" y="533" fill="#90a0b5">滚</text>
+<text x="524" y="533" fill="#90a0b5">动</text>
+<text x="554" y="533" fill="#90a0b5">·</text>
+<text x="574" y="533" fill="#90a0b5">C</text>
+<text x="584" y="533" fill="#90a0b5">t</text>
+<text x="594" y="533" fill="#90a0b5">r</text>
+<text x="604" y="533" fill="#90a0b5">l</text>
+<text x="614" y="533" fill="#90a0b5">-</text>
+<text x="624" y="533" fill="#90a0b5">C</text>
+<text x="644" y="533" fill="#90a0b5">取</text>
+<text x="664" y="533" fill="#90a0b5">消</text>
+<rect x="684" y="514" width="340" height="25" fill="#12161d"/>
+</g></svg>

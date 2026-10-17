@@ -1,32 +1,38 @@
 {
-  "name": "terminal-agent",
+  "name": "sayrun",
   "version": "0.1.0",
   "type": "module",
   "description": "Interactive terminal agent and zsh integration powered by your installed DSH",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jiangkk/terminal-agent.git"
+  },
   "license": "UNLICENSED",
   "files": [
-    "dist/",
-    "README.md",
-    "ADAPTERS.md"
+    "dist/"
   ],
   "os": [
     "darwin",
     "linux"
   ],
   "bin": {
-    "terminal-agent": "./dist/terminal-agent.mjs"
+    "sayrun": "./dist/sayrun.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs && bun test test/ui.test.ts",
-    "preview": "node bin/terminal-agent.mjs preview",
+    "test": "node --import tsx --test test/*.test.mjs && bun test test/ui.test.ts",
+    "preview": "node dist/sayrun.js preview",
     "test:pty": "python3 test/terminal-pty.py && python3 test/history-pty.py",
-    "doctor": "node bin/terminal-agent.mjs doctor",
+    "doctor": "node dist/sayrun.js doctor",
     "test:package": "python3 test/package-install.py",
-    "build": "node scripts/build.mjs",
+    "build": "npm run typecheck && bun scripts/build.ts",
     "prepack": "npm run build",
     "prepublishOnly": "npm run build",
     "pretest": "npm run build",
-    "test:build": "npm run build && node --test test/build.test.mjs"
+    "test:build": "npm run build && node --import tsx --test test/build.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "prepreview": "npm run build",
+    "predoctor": "npm run build",
+    "pretest:pty": "npm run build"
   },
   "engines": {
     "node": ">=22"
@@ -37,5 +43,11 @@
     "marked": "17.0.1",
     "smol-toml": "1.9.1",
     "string-width": "7.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.3",
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
   }
 }
