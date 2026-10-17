@@ -1,0 +1,17 @@
+# Source and development tooling
+src/
+bin/
+scripts/
+shell/
+test/
+tsconfig.json
+
+# Detailed documentation stays in the repository; npm includes the root README
+docs/
+
+# Local state and build intermediates
+.runtime/
+.dist-*/
+.env
+*.log
+*.tgz

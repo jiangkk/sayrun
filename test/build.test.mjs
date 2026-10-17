@@ -4,10 +4,10 @@ import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { packageRoot } from '../src/paths.mjs';
+import { packageRoot } from '../src/platform/paths.ts';
 
 const dist = join(packageRoot, 'dist');
-const entrypoint = join(dist, 'terminal-agent.mjs');
+const entrypoint = join(dist, 'sayrun.js');
 const run = (args, env = process.env) => spawnSync(process.execPath, [entrypoint, ...args], { env, encoding: 'utf8', timeout: 15000 });
 
 test('minified Node entry runs management without loading Bun-only OpenTUI', async (t) => {
@@ -22,11 +22,11 @@ test('minified Node entry runs management without loading Bun-only OpenTUI', asy
 });
 
 test('release contains minified standalone assets without source maps, original modules, or developer paths', async () => {
-  assert.deepEqual((await readdir(dist)).sort(), ['terminal-agent.mjs', 'terminal-agent.zsh', 'terminal-tool.mjs', 'ui-opentui.mjs']);
-  for (const filename of ['terminal-agent.mjs', 'terminal-tool.mjs', 'ui-opentui.mjs']) {
+  assert.deepEqual((await readdir(dist)).sort(), ['sayrun.js', 'sayrun.zsh', 'terminal-tool.js', 'ui-opentui.js']);
+  for (const filename of ['sayrun.js', 'terminal-tool.js', 'ui-opentui.js']) {
     const code = await readFile(join(dist, filename), 'utf8');
     assert.ok(!code.includes('sourceMappingURL=')); assert.ok(!code.includes(packageRoot));
-    assert.ok(!code.includes("from '../src/"));
+    assert.ok(!code.includes("from '../src"));
     // Executable statements must be compacted, allowing multiline prompt strings.
     assert.ok(code.split('\n').some((line) => line.length > 1000), filename);
   }
@@ -34,8 +34,8 @@ test('release contains minified standalone assets without source maps, original 
 });
 
 test('built DSH plugin preserves the public exports and registers both host tools', async () => {
-  const { apply, inject, name } = await import('../dist/terminal-tool.mjs');
-  assert.equal(name, 'terminal-agent-bridge'); assert.deepEqual(inject, ['tools']);
+  const { apply, inject, name } = await import('../dist/terminal-tool.js');
+  assert.equal(name, 'sayrun-bridge'); assert.deepEqual(inject, ['tools']);
   const tools = []; apply({ tools: { register: (tool) => tools.push(tool) } });
   assert.deepEqual(tools.map((tool) => tool.name), ['terminal_command', 'terminal_question']);
   assert.ok(tools.every((tool) => typeof tool.execute === 'function'));
@@ -43,7 +43,7 @@ test('built DSH plugin preserves the public exports and registers both host tool
 
 test('built shell integration targets the built CLI and supports paths resolved from installed assets', () => {
   const init = run(['shell', 'init', 'zsh']); assert.equal(init.status, 0, init.stderr);
-  assert.ok(init.stdout.includes(join(dist, 'terminal-agent.zsh')));
+  assert.ok(init.stdout.includes(join(dist, 'sayrun.zsh')));
   const result = spawnSync('/bin/zsh', ['-f', '-i', '-c', `${init.stdout}\nta --version\n`], { encoding: 'utf8', timeout: 15000 });
   assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /0\.1\.0/);
 });
