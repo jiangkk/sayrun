@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { parseArguments } from '../src/cli.mjs';
-import { runtimeHome, credentialsPath, packageRoot } from '../src/paths.mjs';
-import { bunExecutable } from '../src/runtime.mjs';
+import { parseArguments } from '../src/cli/main.ts';
+import { runtimeHome, credentialsPath, packageRoot } from '../src/platform/paths.ts';
+import { bunExecutable } from '../src/platform/bun-runtime.ts';
 
 test('CLI exposes interactive, explicit task, shorthand, and local management entrypoints', () => {
   assert.equal(parseArguments([]).mode, 'interactive');
@@ -32,7 +32,7 @@ test('runtime state and credentials use independent user paths with explicit ove
 
 test('help/version work without DSH and non-TTY input fails without starting a task', () => {
   const env = { ...process.env, TERMINAL_AGENT_DSH_BIN: '/missing/dsh' };
-  const run = (...args) => spawnSync(process.execPath, [join(packageRoot, 'bin/terminal-agent.mjs'), ...args], { env, encoding: 'utf8' });
+  const run = (...args) => spawnSync(process.execPath, [join(packageRoot, 'dist/sayrun.js'), ...args], { env, encoding: 'utf8' });
   assert.match(run('--help').stdout, /shell init zsh/);
   assert.equal(run('--version').status, 0);
   assert.equal(run().status, 1);
@@ -42,7 +42,7 @@ test('help/version work without DSH and non-TTY input fails without starting a t
 });
 
 test('zsh init is deterministic and preserves an existing ta function or alias', () => {
-  const init = spawnSync(process.execPath, [join(packageRoot, 'bin/terminal-agent.mjs'), 'shell', 'init', 'zsh'], { encoding: 'utf8' });
+  const init = spawnSync(process.execPath, [join(packageRoot, 'dist/sayrun.js'), 'shell', 'init', 'zsh'], { encoding: 'utf8' });
   assert.equal(init.status, 0, init.stderr);
   assert.equal(init.stdout.split('\n').length, 2);
   for (const definition of ['ta() { print EXISTING_TA; }', "alias ta='print EXISTING_TA'"]) {

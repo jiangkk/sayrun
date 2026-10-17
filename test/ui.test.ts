@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { createTestRenderer } from '@opentui/core/testing';
-import { OpenTuiUi } from '../src/ui-opentui.mjs';
+import { OpenTuiUi } from '../src/terminal/ui-opentui.ts';
 
 const proposal = Object.freeze({ command: 'printf ORIGINAL', description: '展示原始命令', cwd: '/tmp' });
 

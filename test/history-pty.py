@@ -11,7 +11,7 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
-CLI = ROOT / "bin/terminal-agent.mjs"
+CLI = ROOT / "dist/sayrun.js"
 
 class Terminal:
     def __init__(self, args, env, cwd):
