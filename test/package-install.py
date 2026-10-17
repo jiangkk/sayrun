@@ -115,7 +115,7 @@ with tempfile.TemporaryDirectory(prefix="ta-npm-") as temp:
     # npm pack must create a fresh release via prepack, without prior dist files.
     shutil.rmtree(ROOT / "dist", ignore_errors=True)
     packed = json.loads(run(["npm", "pack", "--silent", "--json", "--pack-destination", str(temp), "--cache", CACHE], cwd=ROOT))[0]
-    assert packed["name"] == "sayrun"
+    assert packed["name"] == "sayrun-shell"
     paths = {entry["path"] for entry in packed["files"]}
     assert {"dist/sayrun.js", "dist/ui-opentui.js", "dist/terminal-tool.js", "dist/sayrun.zsh"} <= paths
     assert not any(path.startswith(("src/", "bin/", "shell/", "dsh/", "scripts/", "test/", "docs/", ".runtime/", "node_modules/", ".git/")) or ".credentials" in path or path == ".env" for path in paths)
@@ -129,7 +129,7 @@ with tempfile.TemporaryDirectory(prefix="ta-npm-") as temp:
     except subprocess.CalledProcessError as error:
         raise RuntimeError(error.stderr) from error
     print("PASS: tarball allowlist and isolated npm install --global", flush=True)
-    package = prefix / "lib/node_modules/sayrun"
+    package = prefix / "lib/node_modules/sayrun-shell"
     cli = prefix / "bin/sayrun"
     assert cli.exists()
     assert not (prefix / "bin/terminal-agent").exists(), "Sayrun must not claim another npm package's command"

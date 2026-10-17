@@ -41,9 +41,9 @@ export async function manage(mode: string, argv: string[]) {
   }
   if (mode === 'update') {
     const { opts, args } = options(argv, { flags: ['check', 'json'] }); arity(args, 0);
-    if (!opts.check) { write('更新：npm install -g sayrun@latest\n配置 schema=1；修改配置前会创建 .bak。不会自动更新或发布。\n'); return 0; }
-    const result = spawnSync('npm', ['view', 'sayrun', 'version', '--json', '--fetch-retries=0', '--fetch-timeout=10000'], { encoding: 'utf8', timeout: 12000 });
-    print({ current: version, latest: result.status === 0 ? JSON.parse(result.stdout) : null, status: result.status === 0 ? 'checked' : 'unavailable', note: result.status === 0 ? '使用 npm install -g sayrun@latest 更新' : 'registry 未发布或无法访问，未修改安装' }, opts.json); return 0;
+    if (!opts.check) { write('更新：npm install -g sayrun-shell@latest\n配置 schema=1；修改配置前会创建 .bak。不会自动更新或发布。\n'); return 0; }
+    const result = spawnSync('npm', ['view', 'sayrun-shell', 'version', '--registry=https://registry.npmjs.org/', '--json', '--fetch-retries=0', '--fetch-timeout=10000'], { encoding: 'utf8', timeout: 12000 });
+    print({ current: version, latest: result.status === 0 ? JSON.parse(result.stdout) : null, status: result.status === 0 ? 'checked' : 'unavailable', note: result.status === 0 ? '使用 npm install -g sayrun-shell@latest 更新' : 'registry 未发布或无法访问，未修改安装' }, opts.json); return 0;
   }
   if (mode === 'config') return configCommand(argv);
   if (mode === 'profile') { const { opts, args } = options(argv, { flags: ['json'] }); if (args.join(' ') !== 'list') throw invalid('用法：profile list'); const { config } = await loadConfig(); print(config.profiles, opts.json); return 0; }

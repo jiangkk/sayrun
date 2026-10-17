@@ -13,7 +13,7 @@
 ```zsh
 npm install
 npm pack                          # prepack 自动构建并压缩
-npm install -g ./sayrun-0.1.0.tgz
+npm install -g ./sayrun-shell-0.1.0.tgz
 sayrun setup --dry-run
 sayrun setup
 sayrun doctor
@@ -44,7 +44,7 @@ sayrun shell status
 ```zsh
 sayrun shell uninstall --dry-run
 sayrun shell uninstall
-npm uninstall -g sayrun
+npm uninstall -g sayrun-shell
 ```
 
 卸载集成只移除标记区块并备份 zshrc；配置与历史保留。旧版手工添加的无标记 source/eval 行需要自行删除。
@@ -311,3 +311,5 @@ npm pack --dry-run
 npm pack
 # 确认发布目标和账号后再手动 npm publish；本仓库不会自动发布。
 ```
+
+npm 包名为 `sayrun-shell`，CLI 名称仍为 `sayrun`。`publishConfig` 固定发布到官方 registry，并将访问级别设为 public。手动发布可执行 `npm publish --access=public --registry=https://registry.npmjs.org/`。
