@@ -16,6 +16,13 @@ def run_case(mode, ui_mode):
         env = dict(os.environ, TERM="xterm-256color", TA_HOME=os.path.join(runtime, "product"), TERMINAL_AGENT_HOME=runtime, TERMINAL_AGENT_UI=ui_mode,
                    TERMINAL_AGENT_FIXTURE_SCENARIO="question" if mode in ("question", "question-cancel") else "max-tokens" if mode == "max-tokens" else "",
                    TERMINAL_AGENT_DSH_BIN=os.path.join(root, "test", "fixture-dsh.mjs"))
+        if mode == "setup":
+            env["ZDOTDIR"] = runtime
+            os.mkdir(os.path.join(runtime, "bin"))
+            os.symlink(os.path.join(root, "dist", "sayrun.js"), os.path.join(runtime, "bin", "sayrun"))
+            env["PATH"] = os.path.join(runtime, "bin") + os.pathsep + env["PATH"]
+            with open(os.path.join(runtime, ".zshrc"), "w") as config:
+                config.write("PS1='SETUP_PROMPT> '\n")
         pid, master = pty.fork()
         if pid == 0:
             os.chdir(root)
@@ -51,6 +58,39 @@ def run_case(mode, ui_mode):
             raise AssertionError("missing " + marker + "\n" + visible[-9000:].decode(errors="replace"))
 
         try:
+            if mode == "setup":
+                send("PS1='TEST_PROMPT> '; sayrun setup\n")
+                until("应用以上配置？ [y/N]")
+                send("n\n")
+                until("TEST_PROMPT> ")
+                with open(os.path.join(runtime, ".zshrc")) as config:
+                    assert "sayrun" not in config.read()
+                send("sayrun setup --yes\n")
+                until("正在进入已启用 Sayrun 的新 zsh")
+                until("sayrun 已启用")
+                until("SETUP_PROMPT> ")
+                send("typeset setup_shell_pid=$$; sayrun shell off; sayrun setup\n")
+                until("应用以上配置？ [y/N]")
+                send("n\n")
+                until("SETUP_PROMPT> ")
+                send("sayrun shell status\n")
+                until("enabled=0")
+                until("SETUP_PROMPT> ")
+                send("sayrun setup --yes\n")
+                until("sayrun 已启用")
+                until("SETUP_PROMPT> ")
+                send("[[ $$ == $setup_shell_pid ]] && printf 'SAME_%s\\n' SHELL\n")
+                until("SAME_SHELL")
+                until("SETUP_PROMPT> ")
+                send("帮我验证 setup 后直接输入\n")
+                until("执行？[Y/n/q]")
+                send("n\n")
+                until("已拒绝，命令未执行")
+                until("SETUP_PROMPT> ")
+                send("exit\n")
+                until("TEST_PROMPT> ")
+                send("exit\n")
+                return
             startup = "PS1='TEST_PROMPT> '; "
             if mode == "reload":
                 plugins = os.path.expanduser("~/.oh-my-zsh/custom/plugins")
@@ -165,6 +205,8 @@ def run_case(mode, ui_mode):
                     break
                 time.sleep(0.02)
 
+run_case("setup", "plain")
+print("PASS: first setup activates zsh, cancellation preserves state, repeat setup refreshes without nesting", flush=True)
 for ui_mode in ("plain", "tui"):
     for case in ("approve", "default-approve", "deny", "cancel", "question", "question-cancel", "classify", "max-tokens"):
         run_case(case, ui_mode)
