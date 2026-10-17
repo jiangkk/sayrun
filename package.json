@@ -9,7 +9,8 @@
   },
   "license": "UNLICENSED",
   "files": [
-    "dist/"
+    "dist/",
+    "docs/images/approval-preview.png"
   ],
   "os": [
     "darwin",

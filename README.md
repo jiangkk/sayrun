@@ -18,7 +18,7 @@ Sayrun 将自然语言任务接入现有 zsh 提示符。你可以直接描述�
 
 ## 效果预览
 
-![命令审批界面：任务描述、命令预览，以及批准、拒绝和编辑操作](docs/images/approval-preview.png)
+![命令审批界面：任务描述、命令预览，以及批准、拒绝和编辑操作](https://cdn.jsdelivr.net/npm/sayrun-shell@latest/docs/images/approval-preview.png)
 
 *上图由项目实际的 OpenTUI 渲染器生成，使用演示任务和路径，未调用模型或执行命令。*
 
