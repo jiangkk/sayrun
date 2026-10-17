@@ -11,18 +11,18 @@
 需要 Node.js >= 22、zsh，以及 PATH 中已完成认证的 DSH。Sayrun 复用 DSH 的凭证。npm 包固定安装 Bun 1.4.3、OpenTUI 0.6.6，不需要额外全局安装 Bun。
 
 ```zsh
-npm install
-npm pack                          # prepack 自动构建并压缩
-npm install -g ./sayrun-shell-0.1.0.tgz
+npm install -g sayrun-shell
 sayrun setup --dry-run
 sayrun setup
 sayrun doctor
 sayrun ask "找出当前目录最大的十个文件，只读取文件信息"
 ```
 
-目前使用本地 tarball，未发布 registry / Homebrew。已在 macOS / arm64 验证；Linux 和其他架构仍需要实际发布测试。
+已发布到 npm。源码也可通过 `npm install`、`npm pack` 构建 tarball，再全局安装；暂未提供 Homebrew 安装。已在 macOS / arm64 验证；Linux 和其他架构仍需要实际发布测试。
 
-`setup` 会先展示配置、历史和 zshrc 的修改计划，经确认后创建备份，只管理自己的标记区块。重复执行不会添加多个区块。`--yes` 可显式跳过确认；`--zshrc /path/.zshrc` 指定文件；`--temporary` 只初始化配置和存储并给出临时启用命令。
+`setup` 会先展示配置、历史和 zshrc 的修改计划，经确认后创建备份，只管理自己的标记区块。重复执行不会添加多个区块。首次在交互式终端配置后，会自动进入已加载集成的新 zsh，可以直接输入自然语言；`exit` 返回原终端。已经加载集成时，会直接刷新当前 shell，不再嵌套新 shell。
+
+`--yes` 可显式跳过确认；`--no-shell` 仅完成配置，不启用当前终端；`--zshrc /path/.zshrc` 指定文件；`--temporary` 只初始化配置和存储。非交互式调用和后两种选项均不会启动新 shell，会显示手动启用命令；已加载集成的终端仍会在成功配置后刷新，除非指定 `--no-shell`。取消确认时退出码为 130，不改变当前集成状态。
 
 也可仅在当前交互式 zsh 中启用：
 

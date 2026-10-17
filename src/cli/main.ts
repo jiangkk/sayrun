@@ -32,7 +32,7 @@ const help = `Sayrun ${version}
       sayrun config show --effective [--profile ops] | get/set <key> [value] [--project]
       sayrun config edit/validate | trust .
       sayrun profile list
-      sayrun setup [--dry-run | --yes] [--temporary] [--zshrc /path/.zshrc]
+      sayrun setup [--dry-run | --yes] [--no-shell] [--temporary] [--zshrc /path/.zshrc]
       sayrun shell init zsh | on | off | status | uninstall
       sayrun doctor [--live] [--json]             --live 才发送模型探测
       sayrun preview                              离线审批预览
