@@ -5,21 +5,25 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { loadConfig, saveConfig, trustProject, defaults, validateConfig } from '../src/config.mjs';
-import { SessionStore, visibleContext, exportMarkdown } from '../src/sessions.mjs';
-import { editShellBlock, shellBlock, shellPlan, applyShellPlan, editorArgv } from '../src/setup.mjs';
-import { runAgent } from '../src/agent.mjs';
-import { backendEvent, admitBackend } from '../src/backend.mjs';
-import { dshCapabilities } from '../src/backends/dsh.mjs';
-import { convertDsh, migrate } from '../src/migrate.mjs';
-import { productPaths, runtimeHome } from '../src/paths.mjs';
+import { loadConfig, saveConfig, trustProject } from '../src/config/load.ts';
+import { defaults } from '../src/config/defaults.ts';
+import { validateConfig } from '../src/config/schema.ts';
+import { SessionStore } from '../src/history/store.ts';
+import { visibleContext } from '../src/history/context.ts';
+import { exportMarkdown } from '../src/history/export.ts';
+import { editShellBlock, shellBlock, shellPlan, applyShellPlan, editorArgv } from '../src/platform/shell-setup.ts';
+import { runAgent } from '../src/application/run-task.ts';
+import { backendEvent, admitBackend } from '../src/backends/protocol.ts';
+import { dshCapabilities } from '../src/backends/dsh/backend.ts';
+import { convertDsh, migrate } from '../src/history/migrate-dsh.ts';
+import { productPaths, runtimeHome } from '../src/platform/paths.ts';
 
 async function sandbox(t) {
   const dir = await mkdtemp(join(tmpdir(), 'ta-product-')), env = { TA_HOME: join(dir, 'home') }, cwd = join(dir, 'project'); await mkdir(cwd);
   t.after(() => rm(dir, { recursive: true, force: true })); return { dir, env, cwd };
 }
 const config = () => structuredClone(defaults);
-const cliPath = new URL('../bin/terminal-agent.mjs', import.meta.url).pathname;
+const cliPath = new URL('../dist/sayrun.js', import.meta.url).pathname;
 const cli = (s, ...args) => spawnSync(process.execPath, [cliPath, ...args], { env: { ...process.env, ...s.env }, cwd: s.cwd, encoding: 'utf8' });
 
 test('TOML precedence, provenance, scoped trust, protected fields and profile limits', async (t) => {
@@ -64,6 +68,18 @@ test('setup/uninstall manage only an idempotent marked block and refuse malforme
   await writeFile(path, 'changed'); await assert.rejects(applyShellPlan(plan), /已变化/);
   assert.deepEqual(editorArgv('code --wait "a b"'), ['code', '--wait', 'a b']);
   assert.throws(() => editorArgv('"bad'));
+});
+
+test('Sayrun upgrades and removes the legacy managed shell block without duplicating integration', () => {
+  const custom = '# custom\nsource other-plugin.zsh\n';
+  const legacy = '# >>> terminal-agent >>>\neval "$(terminal-agent shell init zsh)"\n# <<< terminal-agent <<<\n';
+  const upgraded = editShellBlock(custom + legacy, true);
+  assert.equal(upgraded, custom + shellBlock);
+  assert.equal(editShellBlock(upgraded, true), upgraded);
+  assert.equal(editShellBlock(custom + legacy, false), custom);
+  assert.equal(editShellBlock(custom + legacy + shellBlock, true), custom + shellBlock);
+  assert.throws(() => editShellBlock(custom + '# >>> terminal-agent >>>\n', true), /不完整/);
+  assert.throws(() => editShellBlock('# >>> terminal-agent >>>\n' + shellBlock + '# <<< terminal-agent <<<\n', true), /嵌套/);
 });
 
 async function stored(s, fields = {}) {
@@ -208,7 +224,7 @@ test('registered process adapter uses argv/whitelisted environment and runtime c
   const s = await sandbox(t), manifest = join(s.dir, 'adapter.json');
   const worker = new URL('./fixture-backend.mjs', import.meta.url).pathname;
   await writeFile(manifest, JSON.stringify({ apiVersion: 1, executable: process.execPath, args: [worker], env: [] }));
-  const { ProcessBackend } = await import('../src/backends/process.mjs');
+  const { ProcessBackend } = await import('../src/backends/process/backend.ts');
   const backend = new ProcessBackend('fixture', { manifest });
   assert.equal((await backend.probe()).available, true);
   const result = await coordinate(s, backend, { uiFactory: ui({ approve: (p) => ({ ...p, command: 'printf host-edited' }) }) }); assert.equal(result.exitCode, 0);
@@ -217,7 +233,7 @@ test('registered process adapter uses argv/whitelisted environment and runtime c
 });
 
 test('backend disconnect cancels an outstanding approval before a command can execute', async (t) => {
-  const s = await sandbox(t), { EventQueue } = await import('../src/backend.mjs'); let executions = 0, closed = false;
+  const s = await sandbox(t), { EventQueue } = await import('../src/backends/protocol.ts'); let executions = 0, closed = false;
   const events = new EventQueue();
   const backend = { id: 'fixture', apiVersion: 1, probe: async () => ({ available: true, capabilities: dshCapabilities, diagnostics: [] }),
     connect: async () => ({ run({ runId }) { events.push(backendEvent(runId, { ...command, cwd: s.cwd })); return events; }, reply: async () => {}, interrupt: async () => {}, close: async () => { closed = true; events.end(); } }) };
@@ -238,8 +254,8 @@ test('setup CLI applies idempotently, uninstalls its block, and shell wrapper to
   const first = cli(s, 'setup', '--yes', '--zshrc', zshrc); assert.equal(first.status, 0, first.stdout);
   const once = await readFile(zshrc, 'utf8'); const second = cli(s, 'setup', '--yes', '--zshrc', zshrc); assert.equal(second.status, 0, second.stdout); assert.equal(await readFile(zshrc, 'utf8'), once);
   assert.equal(cli(s, 'shell', 'uninstall', '--yes', '--zshrc', zshrc).status, 0); assert.equal(await readFile(zshrc, 'utf8'), before);
-  const source = new URL('../shell/terminal-agent.zsh', import.meta.url).pathname;
-  const toggle = spawnSync('/bin/zsh', ['-f', '-i', '-c', 'source "$1" >/dev/null; ta shell off; ta shell status; terminal-agent shell on; terminal-agent shell status', 'test', source], { env: { ...process.env, ...s.env }, encoding: 'utf8' });
+  const source = new URL('../shell/sayrun.zsh', import.meta.url).pathname;
+  const toggle = spawnSync('/bin/zsh', ['-f', '-i', '-c', 'source "$1" >/dev/null; ta shell off; ta shell status; sayrun shell on; sayrun shell status', 'test', source], { env: { ...process.env, ...s.env }, encoding: 'utf8' });
   assert.equal(toggle.status, 0, toggle.stderr); assert.match(toggle.stdout, /enabled=0/); assert.match(toggle.stdout, /enabled=1/);
 });
 

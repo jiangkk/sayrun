@@ -58,13 +58,13 @@ def run_case(mode, ui_mode):
                 startup += "_zsh_autosuggest_start; "
                 highlight = f"{plugins}/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
                 if os.path.exists(highlight): startup += f"source '{highlight}'; "
-            send(startup + "source ./shell/terminal-agent.zsh\n")
-            until("terminal-agent 已启用")
+            send(startup + "source ./shell/sayrun.zsh\n")
+            until("sayrun 已启用")
             until("TEST_PROMPT> ")
             if mode == "reload":
                 for iteration in range(3):
-                    send("terminal-agent-off\n")
-                    until("terminal-agent 已关闭")
+                    send("sayrun-off\n")
+                    until("sayrun 已关闭")
                     until("TEST_PROMPT> ")
                     send(f"printf 'RELOAD_%s_OK\\n' {iteration}\n")
                     until(f"RELOAD_{iteration}_OK")
@@ -72,8 +72,8 @@ def run_case(mode, ui_mode):
                     # Sourcing twice must update safely without wrapping the
                     # wrapper again or recursing through the saved widget.
                     for _ in range(2):
-                        send("source ./shell/terminal-agent.zsh\n")
-                        until("terminal-agent 已启用")
+                        send("source ./shell/sayrun.zsh\n")
+                        until("sayrun 已启用")
                         until("TEST_PROMPT> ")
                 send("帮我验证重新加载\n")
                 until("执行？[Y/n/q]")
@@ -141,8 +141,8 @@ def run_case(mode, ui_mode):
                 until("任务已取消")
             until("TEST_PROMPT> ")
             # shell remains usable and widget restoration works.
-            send("terminal-agent-off\n")
-            until("terminal-agent 已关闭")
+            send("sayrun-off\n")
+            until("sayrun 已关闭")
             until("TEST_PROMPT> ")
             send("printf 'AFTER_%s\\n' OK\n")
             until("AFTER_OK")
