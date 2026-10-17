@@ -5,7 +5,7 @@
   "description": "Interactive terminal agent and zsh integration powered by your installed DSH",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jiangkk/terminal-agent.git"
+    "url": "git+https://github.com/jiangkk/sayrun.git"
   },
   "license": "UNLICENSED",
   "files": [
