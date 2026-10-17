@@ -1,0 +1,41 @@
+{
+  "name": "terminal-agent",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Interactive terminal agent and zsh integration powered by your installed DSH",
+  "license": "UNLICENSED",
+  "files": [
+    "dist/",
+    "README.md",
+    "ADAPTERS.md"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "bin": {
+    "terminal-agent": "./dist/terminal-agent.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs && bun test test/ui.test.ts",
+    "preview": "node bin/terminal-agent.mjs preview",
+    "test:pty": "python3 test/terminal-pty.py && python3 test/history-pty.py",
+    "doctor": "node bin/terminal-agent.mjs doctor",
+    "test:package": "python3 test/package-install.py",
+    "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run build",
+    "pretest": "npm run build",
+    "test:build": "npm run build && node --test test/build.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@opentui/core": "0.6.6",
+    "bun": "1.4.3",
+    "marked": "17.0.1",
+    "smol-toml": "1.9.1",
+    "string-width": "7.2.0"
+  }
+}
