@@ -22,8 +22,8 @@ test('minified Node entry runs management without loading Bun-only OpenTUI', asy
 });
 
 test('release contains minified standalone assets without source maps, original modules, or developer paths', async () => {
-  assert.deepEqual((await readdir(dist)).sort(), ['sayrun.js', 'sayrun.zsh', 'terminal-tool.js', 'ui-opentui.js']);
-  for (const filename of ['sayrun.js', 'terminal-tool.js', 'ui-opentui.js']) {
+  assert.deepEqual((await readdir(dist)).sort(), ['command-opentui.js', 'sayrun.js', 'sayrun.zsh', 'terminal-tool.js', 'ui-opentui.js']);
+  for (const filename of ['sayrun.js', 'terminal-tool.js', 'ui-opentui.js', 'command-opentui.js']) {
     const code = await readFile(join(dist, filename), 'utf8');
     assert.ok(!code.includes('sourceMappingURL=')); assert.ok(!code.includes(packageRoot));
     assert.ok(!code.includes("from '../src"));
@@ -41,9 +41,9 @@ test('built DSH plugin preserves the public exports and registers both host tool
   assert.ok(tools.every((tool) => typeof tool.execute === 'function'));
 });
 
-test('built shell integration targets the built CLI and supports paths resolved from installed assets', () => {
+test('built shell integration targets the built CLI and supports paths resolved from installed assets', async () => {
   const init = run(['shell', 'init', 'zsh']); assert.equal(init.status, 0, init.stderr);
   assert.ok(init.stdout.includes(join(dist, 'sayrun.zsh')));
   const result = spawnSync('/bin/zsh', ['-f', '-i', '-c', `${init.stdout}\nta --version\n`], { encoding: 'utf8', timeout: 15000 });
-  assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /0\.1\.0/);
+  assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, new RegExp(JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')).version.replaceAll('.', '\\.')));
 });

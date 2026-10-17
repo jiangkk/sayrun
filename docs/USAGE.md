@@ -20,7 +20,7 @@ sayrun ask "找出当前目录最大的十个文件，只读取文件信息"
 
 已发布到 npm。源码也可通过 `npm install`、`npm pack` 构建 tarball，再全局安装；暂未提供 Homebrew 安装。已在 macOS / arm64 验证；Linux 和其他架构仍需要实际发布测试。
 
-`setup` 会先展示配置、历史和 zshrc 的修改计划，经确认后创建备份，只管理自己的标记区块。重复执行不会添加多个区块。首次在交互式终端配置后，会自动进入已加载集成的新 zsh，可以直接输入自然语言；`exit` 返回原终端。已经加载集成时，会直接刷新当前 shell，不再嵌套新 shell。
+`setup` 默认用 OpenTUI 展示品牌字标，以及配置、历史和 zshrc 的修改计划，经确认后创建备份，只管理自己的标记区块。重复执行不会添加多个区块。首次在交互式终端配置后，会自动进入已加载集成的新 zsh，可以直接输入自然语言；`exit` 返回原终端。已经加载集成时，会直接刷新当前 shell，不再嵌套新 shell。
 
 `--yes` 可显式跳过确认；`--no-shell` 仅完成配置，不启用当前终端；`--zshrc /path/.zshrc` 指定文件；`--temporary` 只初始化配置和存储。非交互式调用和后两种选项均不会启动新 shell，会显示手动启用命令；已加载集成的终端仍会在成功配置后刷新，除非指定 `--no-shell`。取消确认时退出码为 130，不改变当前集成状态。
 
@@ -77,6 +77,8 @@ sayrun preview                # 无模型、无命令执行的 UI 预览
 | `↑` `↓` / `PgUp` `PgDn` / 滚轮 | 滚动命令预览 |
 | 问题框 `Enter` / `Ctrl-S` | 发送文本回答；不会批准任何命令 |
 | `Ctrl-C` | 取消任务并恢复终端 |
+
+管理命令也使用 OpenTUI：`doctor` 显示环境检查清单，配置与后端显示分组结果，`sessions` 用 ↑/↓ 选择、Enter 查看、Esc 返回。setup 确认默认选中返回 shell，可用 ←/→ 或 Tab 切换；按 y 确认、n 取消。`--json` 与导出保留原始数据格式；非 TTY、`TERM=dumb` 和 `ui.mode=plain` 自动使用纯文本。
 
 OpenTUI 的粘贴和换行不会触发执行。纯文本模式保留逐条审批、追问、输出和取消；输入 `e` 用 `$VISUAL` / `$EDITOR` 编辑命令，编辑器退出后重新展示并审批。方向键选择和内嵌多行编辑属于 OpenTUI 交互。
 
@@ -300,7 +302,7 @@ Node 源码测试通过开发依赖 `tsx` 加载 TypeScript；消费者运行构
 
 ## 构建与发包
 
-源码与构建脚本使用 TypeScript，逐文件职责和架构建议见 [ARCHITECTURE.md](ARCHITECTURE.md)。`npm run typecheck` 使用 `tsc --noEmit` 检查类型；`npm run build` 先检查类型，再使用项目固定版本的 Bun，将 CLI、OpenTUI 和 DSH bridge 分别转译并打包到 `dist/sayrun.js`、`dist/ui-opentui.js` 和 `dist/terminal-tool.js`，执行语法压缩、空白压缩和标识符改名（minify / uglify），不生成 source map。OpenTUI 保留独立模块，Node 管理命令和纯文本模式不会提前加载 Bun FFI。zsh 集成作为必要的运行资产生成，去除注释并引用构建后的 CLI。构建失败保留上一次成功产物。
+源码与构建脚本使用 TypeScript，逐文件职责和架构建议见 [ARCHITECTURE.md](ARCHITECTURE.md)。`npm run typecheck` 使用 `tsc --noEmit` 检查类型；`npm run build` 先检查类型，再使用项目固定版本的 Bun，将 CLI、OpenTUI 和 DSH bridge 分别转译并打包到 `dist/sayrun.js`、`dist/ui-opentui.js`、`dist/command-opentui.js` 和 `dist/terminal-tool.js`，执行语法压缩、空白压缩和标识符改名（minify / uglify），不生成 source map。OpenTUI 保留独立模块，非 TTY 管理命令和纯文本模式不会提前加载 Bun FFI；交互终端的管理命令由 Bun 运行共用 OpenTUI 展示层。zsh 集成作为必要的运行资产生成，去除注释并引用构建后的 CLI。构建失败保留上一次成功产物。
 
 `prepack` 和 `prepublishOnly` 都调用构建，分别覆盖 `npm pack` 和 `npm publish`。发布白名单仅声明 `dist/`；npm 还会自动包含根目录 `README.md` 和必需的 `package.json`。`.npmignore` 显式排除 `src/`、`docs/`、`bin/`、`shell/`、构建脚本、测试和 TypeScript 配置；README 位于仓库根目录，详细文档和预览图片保存在 `docs/`。`dist/` 不提交到 Git，消费者安装 tarball 不需要源码或执行构建。
 

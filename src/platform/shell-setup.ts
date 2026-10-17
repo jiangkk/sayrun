@@ -7,6 +7,7 @@ import { atomicWrite, privateDir } from './atomic-file.ts';
 import { productPaths } from './paths.ts';
 import { readConfig, saveConfig } from '../config/load.ts';
 import { invalid } from '../errors.ts';
+import { presentation, report, status } from '../cli/presentation.ts';
 
 const begin = '# >>> sayrun >>>', end = '# <<< sayrun <<<';
 export const shellBlock = `${begin}\nif command -v sayrun >/dev/null 2>&1; then\n  eval "$(sayrun shell init zsh)"\nfi\n${end}\n`;
@@ -40,6 +41,7 @@ export async function applyShellPlan(plan: Awaited<ReturnType<typeof shellPlan>>
 }
 export async function confirm(question: string) {
   if (!process.stdin.isTTY || !process.stdout.isTTY) throw invalid('此操作需要确认；请在终端运行，或显式使用 --yes');
+  if (presentation()) return presentation()!.confirm(question);
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try { return /^(y|yes)$/i.test((await rl.question(`${question} [y/N] `)).trim()); }
   finally { rl.close(); process.stdin.pause(); }
@@ -47,14 +49,34 @@ export async function confirm(question: string) {
 export async function setup({ yes = false, dryRun = false, zshrc, backend = 'dsh', temporary = false }: { yes?: boolean; dryRun?: boolean; zshrc?: string; backend?: string; temporary?: boolean } = {}) {
   if (backend !== 'dsh') throw invalid('当前内置后端为 dsh；外部适配器请使用 backend add');
   const paths = productPaths(), plan = temporary ? null : await shellPlan({ path: zshrc });
-  const output = [`配置：${paths.configFile}`, `历史：${paths.data}`, `状态：${paths.state}`, `缓存：${paths.cache}`,
-    ...(plan ? [`shell：${plan.path}`, plan.after === plan.before ? '标记区块已安装，无需更改' : `将只更新以下标记区块，并备份原文件：\n${shellBlock}`] : ['临时启用：eval "$(sayrun shell init zsh)"'])];
-  process.stdout.write(output.join('\n') + '\n');
-  if (dryRun || !yes && !await confirm('应用以上配置？')) return { applied: false };
+  report('欢迎使用 Sayrun', [
+    { text: '把想做的事交给终端。每条命令，依然由你确认。', tone: 'muted' },
+    { text: '' },
+    { text: '01  安装预览', heading: true, tone: 'accent' },
+    { text: `默认后端  ${backend}` },
+    { text: `配置  ${paths.configFile}` },
+    { text: `历史  ${paths.data}` },
+    { text: `状态  ${paths.state}` },
+    { text: `缓存  ${paths.cache}` },
+    { text: '' },
+    { text: '02  连接你的 Shell', heading: true, tone: 'accent' },
+    ...(plan ? [
+      { text: `启动文件  ${plan.path}` },
+      { text: plan.after === plan.before ? '标记区块已安装，无需更改。' : '更新 Sayrun 专属标记区块，写入前自动备份原文件。', tone: 'muted' as const },
+    ] : [{ text: '临时配置，不写入 zsh 启动文件。', tone: 'muted' as const }]),
+    { text: '' },
+    { text: dryRun ? '预览模式 · 未修改任何文件。' : '确认后保存配置，并检查本地运行环境。', tone: 'amber' },
+  ], { logo: true });
+  if (dryRun) return { applied: false };
+  if (!yes && !await confirm('应用以上配置？')) {
+    report('已取消设置', [{ text: '未修改任何文件。随时运行 sayrun setup 重新开始。', tone: 'muted' }]);
+    return { applied: false };
+  }
+  status('正在保存配置与 Shell 集成');
   const config = await readConfig(paths.configFile); config.agent ??= {}; config.agent.backend = backend;
   await saveConfig(config);
   for (const path of [paths.data, paths.state, paths.cache]) await privateDir(path);
-  if (plan) { const applied = await applyShellPlan(plan); if (applied.backup) process.stdout.write(`备份：${applied.backup}\n`); }
+  if (plan) { const applied = await applyShellPlan(plan); if (applied.backup) report('已备份启动文件', [{ text: applied.backup, tone: 'muted' }]); }
   return { applied: true };
 }
 // Parse a user's EDITOR argv without evaluating shell substitutions or pipelines.

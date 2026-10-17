@@ -225,3 +225,97 @@ test('native scrollback contains styled text without literal ANSI codes or doubl
     expect(s.externalOutput.takeText().match(/无输出/g)?.length).toBe(1);
   } finally { await s.ui.close(); }
 });
+
+// Management commands share an OpenTUI footer, with reports committed to native
+// scrollback so they remain visible after returning to the parent shell.
+const { OpenTuiCommands } = await import('../src/terminal/command-opentui.ts');
+const { reportRows } = await import('../src/cli/presentation.ts');
+const stringWidth = (await import('string-width')).default;
+
+async function commands(width = 90, height = 24) {
+  const s = await createTestRenderer({ width, height, screenMode: 'split-footer', footerHeight: 3,
+    externalOutputMode: 'capture-stdout', kittyKeyboard: true, exitOnCtrlC: false, exitSignals: [] });
+  return { ...s, ui: new OpenTuiCommands(s.renderer) };
+}
+
+test('setup confirmation defaults to cancel, requires an explicit choice, and ignores pasted approvals', async () => {
+  const s = await commands();
+  try {
+    const cancel = s.ui.confirm('应用以上配置？');
+    await s.renderOnce();
+    expect(s.captureCharFrame()).toContain('› 返回 shell [n]');
+    s.mockInput.pressEnter();
+    expect(await cancel).toBe(false);
+    let settled = false;
+    const apply = s.ui.confirm('应用以上配置？').then((value) => { settled = true; return value; });
+    await s.mockInput.pasteBracketedText('y\n');
+    expect(settled).toBe(false);
+    s.mockInput.pressArrow('left');
+    await s.renderOnce();
+    expect(s.captureCharFrame()).toContain('› 确认应用 [y]');
+    s.mockInput.pressEnter();
+    expect(await apply).toBe(true);
+    const escape = s.ui.confirm('应用以上配置？');
+    s.mockInput.pressEscape();
+    expect(await escape).toBe(false);
+    const interrupt = s.ui.confirm('应用以上配置？');
+    s.mockInput.pressCtrlC();
+    expect(await interrupt).toBe(false);
+  } finally { await s.ui.close(); }
+});
+
+test('command inputs accept text and paste, return empty input, and release focus between prompts', async () => {
+  const s = await commands();
+  try {
+    const answer = s.ui.input('请输入任务');
+    await s.mockInput.pasteBracketedText('帮我检查目录');
+    s.mockInput.pressEnter();
+    expect(await answer).toBe('帮我检查目录');
+    const empty = s.ui.input('继续请求');
+    s.mockInput.pressEnter();
+    expect(await empty).toBe('');
+    const cancel = s.ui.input('继续请求');
+    s.mockInput.pressCtrlC();
+    expect(await cancel).toBeNull();
+    const confirm = s.ui.confirm('应用以上配置？');
+    s.mockInput.pressKey('y');
+    expect(await confirm).toBe(true);
+  } finally { await s.ui.close(); }
+});
+
+test('history selector supports arrows, scroll, resize, and cancellation', async () => {
+  const s = await commands(50, 12);
+  try {
+    const choices = Array.from({ length: 30 }, (_, i) => ({ name: `任务 ${i}`, description: 'dsh · 已完成', value: String(i) }));
+    const selected = s.ui.select('选择历史任务', choices);
+    for (let i = 0; i < 29; i++) s.mockInput.pressArrow('down');
+    await s.renderOnce();
+    expect(s.captureCharFrame()).toContain('任务 29');
+    s.resize(80, 24);
+    await s.renderOnce();
+    expect(s.captureCharFrame()).toContain('任务 29');
+    s.mockInput.pressEnter();
+    expect(await selected).toBe('29');
+    const cancel = s.ui.select('选择历史任务', choices);
+    s.mockInput.pressEscape();
+    expect(await cancel).toBeNull();
+  } finally { await s.ui.close(); }
+});
+
+test('branded reports survive shutdown, sanitize controls, and fit CJK and long paths in narrow terminals', async () => {
+  const s = await commands();
+  try {
+    s.ui.report({ title: '安装预览', logo: true, lines: [{ text: '配置  /tmp/路径\x1b[2J' + '/long'.repeat(30) }] });
+    await s.renderOnce();
+    const history = s.externalOutput.takeText();
+    expect(history).toContain('███████');
+    expect(history).toContain('◆ SAYRUN  /  安装预览');
+    expect(history).not.toContain('\x1b');
+    const narrow = reportRows({ title: '安装预览', logo: true, lines: [{ text: '配置  /tmp/目录' + '/long'.repeat(30) }] }, 40);
+    expect(narrow.some((line) => line.text.includes('████'))).toBe(false);
+    expect(narrow.every((line) => stringWidth(line.text) <= 40)).toBe(true);
+    s.ui.report({ title: '最后结果', lines: [{ text: '退出后仍保留此信息' }] });
+    await s.ui.close();
+    expect(s.externalOutput.takeText()).toContain('退出后仍保留此信息');
+  } finally { await s.ui.close(); }
+});

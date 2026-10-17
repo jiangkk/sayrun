@@ -1,9 +1,11 @@
 import { createInterface } from 'node:readline';
 import { AgentError } from '../errors.ts';
 import { write } from '../terminal/display.ts';
+import { presentation, report } from './presentation.ts';
 
 export function readAnswer(question = 'sayrun> ') {
   if (!process.stdin.isTTY || !process.stdout.isTTY) throw new AgentError('tty_required', '交互需要终端，请直接运行 sayrun；查看帮助请使用 --help');
+  if (presentation()) return presentation()!.input(question);
   return new Promise<string | null>((resolve) => {
     const rl = createInterface({ input: process.stdin, output: process.stdout }); let settled = false;
     const finish = (value: string | null) => { if (settled) return; settled = true; rl.close(); process.stdin.pause(); resolve(value); };
@@ -12,6 +14,6 @@ export function readAnswer(question = 'sayrun> ') {
   });
 }
 export async function readTask() {
-  write('请输入任务；Ctrl-C / Ctrl-D 退出。每次任务使用独立会话。\n');
+  report('开始一个任务', [{ text: '用自然语言描述你想做的事。每条命令执行前都会请你确认。' }, { text: '例如：找出当前目录最大的十个文件', tone: 'muted' }, { text: 'Ctrl-C / Ctrl-D 退出 · 每次任务使用独立会话', tone: 'muted' }]);
   for (;;) { const answer = await readAnswer(); if (answer === null || answer) return answer; }
 }

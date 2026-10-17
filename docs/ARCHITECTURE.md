@@ -21,7 +21,9 @@ src/
     input.ts                      # 交互读取
     main.ts                       # CLI 主流程与任务 / 恢复入口
     manage.ts                     # 管理命令分派与简单命令
-    output.ts                     # 文本 / JSON 输出
+    output.ts                     # 人类可读报告 / 显式 JSON 输出
+    presentation.ts               # 共用报告、状态、交互契约
+    help.ts                       # 分组命令指南
     version.ts                    # 包版本读取
   config/                         # 默认值、校验、加载与保存
   contracts/                      # 共享类型接口
@@ -80,7 +82,9 @@ test/
 | `src/cli/commands/doctor.ts` | 检查 shell、后端、UI、存储、认证与平台；显式 live 时才发送模型探测。 |
 | `src/cli/args.ts` | 管理命令共享的选项类型、解析、参数数量校验。 |
 | `src/cli/input.ts` | 首次任务、历史选择等终端输入；统一 Ctrl-C / EOF 处理，避免历史选择器反向导入 main。 |
-| `src/cli/output.ts` | 文本和 JSON 输出。 |
+| `src/cli/output.ts` | 人类可读报告和显式 JSON 输出。 |
+| `src/cli/presentation.ts` | 管理命令的报告结构、字段展示、历史摘要和终端交互契约；纯文本回退。 |
+| `src/cli/help.ts` | 分组命令指南。 |
 | `src/cli/version.ts` | 从安装包根目录读取版本，兼容源码与 bundle 的不同目录深度。 |
 
 ### 后端与执行
@@ -116,6 +120,8 @@ test/
 
 | 文件 | 内容与职责 |
 | --- | --- |
+| `src/terminal/command-opentui.ts` | 管理命令共用的 OpenTUI 滚动历史、状态栏、确认按钮、输入和历史选择器。 |
+| `src/terminal/theme.ts` | 任务 UI 与管理命令共用的配色和 NO_COLOR 处理。 |
 | `src/terminal/factory.ts` | 选择 PlainUi 或按需加载 OpenTUI。 |
 | `src/terminal/plain.ts` | readline 审批、问题输入和外部编辑器编辑。 |
 | `src/terminal/ui-opentui.ts` | OpenTUI 布局、审批、编辑、追问、键盘鼠标、滚动、尺寸变化与关闭。 |
@@ -155,7 +161,8 @@ test/
 | `test/cli.test.mjs` | CLI 解析、路径、非 TTY 行为和 zsh 接入。 |
 | `test/transcript.test.mjs` | Markdown、换行、控制字符清理和输出摘要。 |
 | `test/build.test.mjs` | 独立 JS 入口、构建资产、插件 exports 和生成的 shell 集成。 |
-| `test/ui.test.ts` | Bun 下 OpenTUI 的渲染、审批、编辑、追问、键盘和滚动。 |
+| `test/ui.test.ts` | Bun 下 OpenTUI 的渲染、审批、编辑、追问、管理交互、窄窗口和滚动。 |
+| `test/commands-pty.py` | 构建后的管理界面、setup 写入/取消、任务输入交接和历史选择的真实终端回归。 |
 | `test/fixture-dsh.mjs` / `test/fixture-backend.mjs` | 可由普通 Node 执行的确定性协议替身，不调用外部模型。 |
 | `test/terminal-pty.py` | 真实 PTY 中的 zsh 与 CLI，覆盖两种 UI、审批、拒绝、取消、问答、编辑与重新加载。 |
 | `test/history-pty.py` | 真实终端中的历史查看、恢复与上下文分支。 |
@@ -195,7 +202,8 @@ test/
 ```text
 tsc --noEmit       → 检查 TypeScript
 Bun.build          → dist/sayrun.js  （Node）
-                   → dist/ui-opentui.js      （Bun，按需加载）
+                   → dist/ui-opentui.js      （Bun，任务交互）
+                   → dist/command-opentui.js （Bun，管理命令）
                    → dist/terminal-tool.js   （Node / DSH 插件）
 shell 源文件       → dist/sayrun.zsh
 ```
