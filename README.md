@@ -33,7 +33,7 @@ Sayrun 将自然语言任务接入现有 zsh 提示符。你可以直接描述�
 | 系统 | 已在 macOS / Apple Silicon 验证；Linux 和其他架构待验证 |
 | 终端 | 交互式终端；自然语言输入集成需要 zsh |
 | Node.js | 22 或更高版本 |
-| DSH | 已安装、完成认证且位于 `PATH`；当前适配已验证的 `0.2.0-rc.2` / `sdk-minimal` |
+| DSH | 已安装、完成认证且位于 `PATH`；使用 `sdk-minimal`，不限制版本号 |
 
 Bun 和 OpenTUI 由 npm 依赖安装，无需额外全局安装 Bun。日常使用不需要 Python。
 

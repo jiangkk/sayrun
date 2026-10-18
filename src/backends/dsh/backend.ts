@@ -21,9 +21,8 @@ export class DshBackend implements AgentBackend {
     const result = spawnSync(this.config.binary || 'dsh', ['--version'], { encoding: 'utf8', timeout: 10000 });
     const available = !result.error && result.status === 0;
     const version = result.stdout?.trim();
-    // Composition has been qualified against this DSH release, not arbitrary future releases.
-    const compatible = available && (version === '0.2.0-rc.2' || /(?:^|\s)0\.2\.0-rc\.2$/.test(version));
-    return { available, version, capabilities: { ...dshCapabilities, hostTools: compatible }, diagnostics: available ? compatible ? ['host-tools · sdk-minimal；持久恢复未验证，使用可见上下文分支'] : [`DSH ${version} 未通过兼容性验证；支持 0.2.0-rc.2`] : ['无法运行 dsh，请安装 DSH 并加入 PATH，或设置 TERMINAL_AGENT_DSH_BIN'] };
+    // Report the installed version without using it to gate host-tools support.
+    return { available, version, capabilities: { ...dshCapabilities, hostTools: available }, diagnostics: available ? ['host-tools · sdk-minimal；持久恢复未验证，使用可见上下文分支'] : ['无法运行 dsh，请安装 DSH 并加入 PATH，或设置 TERMINAL_AGENT_DSH_BIN'] };
   }
   async classify(input: string, options: ClassifyOptions) { const { classifyDsh } = await import('./classifier.ts'); return classifyDsh(input, { ...options, settings: this.config }); }
   async connect(options: ConnectOptions) {

@@ -14,7 +14,7 @@ import { exportMarkdown } from '../src/history/export.ts';
 import { editShellBlock, shellBlock, shellPlan, applyShellPlan, editorArgv } from '../src/platform/shell-setup.ts';
 import { runAgent } from '../src/application/run-task.ts';
 import { backendEvent, admitBackend } from '../src/backends/protocol.ts';
-import { dshCapabilities } from '../src/backends/dsh/backend.ts';
+import { DshBackend, dshCapabilities } from '../src/backends/dsh/backend.ts';
 import { convertDsh, migrate } from '../src/history/migrate-dsh.ts';
 import { productPaths, runtimeHome } from '../src/platform/paths.ts';
 
@@ -218,6 +218,30 @@ test('CLI deterministic management roundtrip works offline without a backend and
   assert.equal(cli(s, 'auth', 'status', 'dsh', '--json').status, 0);
   assert.equal(cli(s, 'config', 'set', 'backends.dsh.api_key', 'secret').status, 2);
   const version = cli(s, 'version', '--json'); assert.equal(version.status, 0, version.stdout); assert.equal(JSON.parse(version.stdout).protocol, 1);
+});
+
+test('DSH admission accepts arbitrary version reports and still rejects unavailable executables', async (t) => {
+  const s = await sandbox(t), binary = join(s.dir, 'dsh');
+  const backend = new DshBackend({ binary });
+  for (const version of ['0.2.0-rc.2', 'dsh 0.2.0', 'dsh 1.0.0-beta.1', 'development', '']) {
+    await writeFile(binary, `#!/bin/sh\nprintf '%s\\n' '${version}'\n`);
+    await chmod(binary, 0o700);
+    const probe = await backend.probe();
+    assert.equal(probe.version, version);
+    assert.equal(probe.available, true);
+    assert.equal(probe.capabilities.hostTools, true);
+    assert.doesNotThrow(() => admitBackend(probe));
+  }
+  await writeFile(binary, '#!/bin/sh\nexit 1\n');
+  const failed = await backend.probe();
+  assert.equal(failed.available, false);
+  assert.equal(failed.capabilities.hostTools, false);
+  assert.throws(() => admitBackend(failed), /无法运行 dsh/);
+  await rm(binary);
+  const missing = await backend.probe();
+  assert.equal(missing.available, false);
+  assert.equal(missing.capabilities.hostTools, false);
+  assert.throws(() => admitBackend(missing), /无法运行 dsh/);
 });
 
 test('registered process adapter uses argv/whitelisted environment and runtime capabilities; same Coordinator handles it', async (t) => {
