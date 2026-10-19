@@ -8,6 +8,8 @@
 
 **命令照常敲，AI 随时问。**
 
+Sayrun (`sayrun-shell`) is an AI terminal assistant for zsh, powered by your installed DeepSeek Harness (DSH). Ask in natural language, review and approve each command, and continue your existing shell workflow.
+
 当前支持 zsh 集成 · 复用已认证的 DSH
 
 [安装使用](#安装使用) · [快速开始](#快速开始) · [功能特性](#功能特性) · [常见问题](#常见问题) · [文档索引](docs/README.md)

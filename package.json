@@ -2,7 +2,7 @@
   "name": "sayrun-shell",
   "version": "0.1.4",
   "type": "module",
-  "description": "Interactive terminal agent and zsh integration powered by your installed DSH",
+  "description": "Sayrun: an AI terminal assistant for zsh. Use natural language, approve each command, and keep your shell workflow. Powered by your installed DeepSeek Harness (DSH).",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jiangkk/sayrun.git"
@@ -13,12 +13,20 @@
     "url": "https://github.com/jiangkk/sayrun/issues"
   },
   "keywords": [
-    "terminal",
+    "sayrun",
+    "shell",
     "zsh",
+    "terminal",
+    "cli",
     "ai",
     "agent",
-    "dsh",
-    "cli"
+    "ai-assistant",
+    "terminal-assistant",
+    "shell-assistant",
+    "natural-language",
+    "deepseek",
+    "deepseek-harness",
+    "dsh"
   ],
   "files": [
     "dist/",
