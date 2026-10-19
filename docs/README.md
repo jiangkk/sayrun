@@ -12,6 +12,7 @@
 | 理解源码结构与模块职责 | [项目结构与职责](development/architecture.md) |
 | 准备开发环境、构建和选择测试 | [构建与测试](development/testing.md) |
 | 贡献代码与提交变更 | [贡献指南](../CONTRIBUTING.md) |
+| 使用开发 Agent 修改仓库 | [Agent 开发约定](../AGENTS.md) |
 | 发布 npm 包、导出源码或部署官网 | [发布与公开源码](development/releasing.md) |
 | 新增、修改或移动文档 | [文档维护规范](development/documentation.md) |
 

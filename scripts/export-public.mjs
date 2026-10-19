@@ -4,7 +4,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const entries = ['.github', '.gitignore', '.npmignore', 'LICENSE', 'README.md', 'CHANGELOG.md',
+const entries = ['.github', '.gitignore', '.npmignore', 'LICENSE', 'README.md', 'AGENTS.md', 'CHANGELOG.md',
   'CONTRIBUTING.md', 'SECURITY.md', 'package.json', 'package-lock.json', 'tsconfig.json',
   'bin', 'src', 'scripts', 'shell', 'test', 'docs', 'website'];
 const excluded = (name) => ['.git', '.runtime', '.dsh', 'node_modules', 'dist', '__pycache__', '.DS_Store', 'id_rsa', 'id_ed25519', '.terminal-agent.toml'].includes(name)
