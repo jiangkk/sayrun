@@ -25,11 +25,13 @@ test('public export includes current source but excludes history, local state an
     await writeFile(join(source, 'src', name), 'private fixture');
   }
   await writeFile(join(source, '.npmrc'), 'private fixture');
+  await writeFile(join(source, 'AGENTS.md'), '# Agent development rules\n');
   await writeFile(join(source, 'src', '.env.example'), 'PUBLIC_SETTING=example');
   await chmod(join(source, 'src', 'main.ts'), 0o755);
   const result = await exportPublic(target, { source });
-  assert.equal(result.files, 5);
-  assert.deepEqual((await readdir(target)).sort(), ['LICENSE', 'README.md', 'package.json', 'src']);
+  assert.equal(result.files, 6);
+  assert.deepEqual((await readdir(target)).sort(), ['AGENTS.md', 'LICENSE', 'README.md', 'package.json', 'src']);
+  assert.equal(await readFile(join(target, 'AGENTS.md'), 'utf8'), '# Agent development rules\n');
   assert.deepEqual((await readdir(join(target, 'src'))).sort(), ['.env.example', 'main.ts']);
   assert.equal(await readFile(join(target, 'src', 'main.ts'), 'utf8'), 'export const version = 1;');
   assert.ok((await stat(join(target, 'src', 'main.ts'))).mode & 0o100);
