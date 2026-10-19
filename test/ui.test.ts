@@ -202,17 +202,17 @@ test('intermediate narration stays out of history; command output is compact and
 test('native scrollback contains styled text without literal ANSI codes or double wrapping', async () => {
   const s = await setup(90, 19);
   try {
-    const command = 'dig @223.5.5.5 oneui-view-bridge.uat.ennew.com A +noall +comments +answer;\necho "---exit:$?"';
+    const command = 'dig @192.0.2.53 service.example.invalid A +noall +comments +answer;\necho "---exit:$?"';
     const approval = s.ui.approve({ ...proposal, command }, 1, 8);
     s.mockInput.pressEnter();
     await approval;
-    const output = 'Server: 192.168.43.1\n\nstatus: NXDOMAIN\n\n---exit:0\n';
+    const output = 'Server: 192.0.2.1\n\nstatus: NXDOMAIN\n\n---exit:0\n';
     s.ui.output(output);
     s.ui.result({ exitCode: 0, output });
     await s.renderOnce();
     const commits = s.externalOutput.take();
     const history = commits.map((commit) => commit.text).join('\n');
-    expect(history).toContain('01  $ dig @223.5.5.5');
+    expect(history).toContain('01  $ dig @192.0.2.53');
     expect(history).toContain('│ status: NXDOMAIN');
     expect(history).not.toMatch(/\x1b|\[(?:36|39|1|22|90|32)m/);
     expect(history).not.toContain('无输出');

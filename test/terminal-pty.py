@@ -151,7 +151,7 @@ def run_case(mode, ui_mode):
                 send("\x1b[200~printf EDITED_STEP; \x1b[201~")
                 send("\x1b[13;2u")  # Shift-Enter inserts a newline.
                 send("\r")  # Enter submits the edited command directly.
-            if mode in ("approve", "default-approve", "question", "classify", "max-tokens", "edit"):
+            if mode in ("approve", "default-approve", "question", "classify", "max-tokens", "edit", "conversation"):
                 if mode != "edit":
                     send("\r" if mode == "default-approve" else ("y\n" if ui_mode == "plain" else "y"))
                 until("✗ 退出码：7")
@@ -180,6 +180,20 @@ def run_case(mode, ui_mode):
                 send("\x03")
                 until("任务已取消")
             until("TEST_PROMPT> ")
+            if mode == "conversation":
+                send("printf 'BETWEEN_%s\\n' QUESTIONS\n")
+                until("BETWEEN_QUESTIONS")
+                until("TEST_PROMPT> ")
+                send("source ./shell/sayrun.zsh\n")
+                until("sayrun 已启用")
+                until("TEST_PROMPT> ")
+                send("根据刚才的结果继续检查\n")
+                for _ in range(2):
+                    until("执行？[Y/n/q]")
+                    send("y\n")
+                until("NATIVE_TURN_2")
+                until("FINAL_ANSWER_END")
+                until("TEST_PROMPT> ")
             # shell remains usable and widget restoration works.
             send("sayrun-off\n")
             until("sayrun 已关闭")
@@ -207,6 +221,8 @@ def run_case(mode, ui_mode):
 
 run_case("setup", "plain")
 print("PASS: first setup activates zsh, cancellation preserves state, repeat setup refreshes without nesting", flush=True)
+run_case("conversation", "plain")
+print("PASS: zsh followups preserve native history across ordinary commands and integration reloads", flush=True)
 for ui_mode in ("plain", "tui"):
     for case in ("approve", "default-approve", "deny", "cancel", "question", "question-cancel", "classify", "max-tokens"):
         run_case(case, ui_mode)

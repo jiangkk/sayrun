@@ -1,14 +1,18 @@
 # Sayrun 使用手册
 
-[返回项目首页](../README.md)
+[文档索引](../README.md) · 分类：使用指南 · 状态：当前
 
-在现有 zsh 提示符输入自然语言，在同一个终端逐条审批命令、查看结果和最终结论。任务结束后返回 shell，每次新请求默认使用新会话。
+本文面向使用 Sayrun 的用户，说明安装、日常任务、配置、历史和故障处理。在现有 zsh 提示符输入自然语言，在同一个终端逐条审批命令、查看结果和最终结论。任务结束后返回 shell；启用集成后，同一 zsh 实例、项目和后端中的后续提问默认延续当前会话，未加载集成的独立调用默认新建会话。
 
 目前内置 **DSH adapter**，使用 DSH 的 `sdk-minimal` profile，不限制版本号。审批、执行、配置和历史通过统一后端契约工作；没有接入 Codex、Claude，也没有实现自己的模型循环。
 
 ## 安装与首次使用
 
 需要 Node.js >= 22、zsh，以及 PATH 中已完成认证的 DSH。Sayrun 复用 DSH 的凭证。npm 包固定安装 Bun 1.4.3、OpenTUI 0.6.6，不需要额外全局安装 Bun。
+
+OpenTUI 当前声明 Node.js >= 26.4.0。Sayrun 在 Bun 中运行界面，Node.js 22 已通过安装与终端回归；npm 默认模式可能提示 `EBADENGINE`，开启 `engine-strict` 时则需要 Node.js 26.4.0+。
+
+DSH 安装与认证请参考 [官方安装说明](https://github.com/deepseek-ai/deepseek-harness#run) 和 [模型配置](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.md)。需要把命令放入 PATH 时，可运行 `npm install -g @deepseek-ai/dsh`，再用 `dsh --version` 验证。版本号不作为准入门槛；实际仍需兼容 `sdk-minimal`、JSON-RPC 和桥接工具接口。
 
 ```zsh
 npm install -g sayrun-shell
@@ -54,6 +58,7 @@ npm uninstall -g sayrun-shell
 ```zsh
 sayrun                        # 提示输入一次任务
 sayrun ask "检查当前项目结构"
+sayrun ask --new "开始一个新任务"
 sayrun "帮我找最大的文件"     # 明确的自然语言快捷入口
 sayrun -- "doctor"            # 强制任务文本，避免管理命令冲突
 sayrun ask --profile ops "检查服务"
@@ -202,7 +207,7 @@ DSH 优先使用配置指定的 API key 环境变量，否则使用已有 DSH �
 
 `backend use` 只改变用户默认字段，当前项目仍有覆盖时会解释有效值与来源。内置 DSH 可通过 `config set backends.dsh.disabled true` 禁用，`backend remove dsh` 等价。重新启用设为 `false`。
 
-`update --check` 仅查询 registry，不安装。实际更新按原渠道重新安装 tarball；不会在 shell 启动或任务中自动升级，也不宣称已公开发布。
+`update --check` 仅查询 registry，不安装。通过 npm 全局安装的用户可运行 `npm install -g sayrun-shell@latest` 更新，其他渠道按原方式安装；不会在 shell 启动或任务中自动升级。
 
 ## 统一历史与恢复
 
@@ -225,6 +230,7 @@ sayrun sessions reindex
 
 sayrun resume <id>                         # 先查看，输入新请求后才调用模型
 sayrun resume --last --prompt "再检查一次"
+sayrun resume <id> --context-only --prompt "使用可见历史继续"
 sayrun sessions fork <id> --backend dsh --context summary
 ```
 
@@ -232,7 +238,9 @@ sayrun sessions fork <id> --backend dsh --context summary
 
 `events.jsonl`、输出附件和原子 `meta.json` 是内容来源；SQLite 索引可以从文件重建，即使索引损坏也能查看、搜索和导出。搜索目前扫描统一文件，不依赖厂商格式或索引可用性。`reindex` 使用 Node 的 SQLite 支持（Node 22 会打印实验特性提示）或 Bun SQLite。
 
-DSH 原生恢复尚未验证，因此 `resume` **明确创建基于可见历史的新分支**，保留 `parentSessionId` 并展示将发送的事件范围。可见上下文包括用户请求、命令执行事实、有限输出、问题回答和结论，默认上限 32 KiB；不额外调用模型生成摘要。`fork --context summary` 同样表示这份本地可见事实摘要。不会回放或执行旧工具调用。
+启用 zsh 集成后，同一 shell 实例、项目和后端中的提问默认延续当前会话，每次提问记录为独立 run。普通命令和重新加载集成不会切断对话；新终端或新启动的 zsh 使用独立会话。同一 Git 项目内切换子目录保留会话，切换项目会使用独立会话，切回来可继续。普通命令的输出不会自动发送给模型。使用 `sayrun ask --new "任务"` 主动开始新对话；关闭本工具历史时不自动续接。
+
+DSH 使用 `session/resume` 恢复原生历史，保留其上下文压缩结果；每轮结束正常关闭后端并保存历史。恢复失败会明确报错，不会静默改为新会话。显式使用 `resume --context-only` 会创建基于可见历史的新分支，保留 `parentSessionId` 并展示将发送的事件范围。可见上下文包括用户请求、命令执行事实、有限输出、问题回答和结论，默认上限 32 KiB；不额外调用模型生成摘要。`fork --context summary` 同样表示这份本地可见事实摘要。恢复与分支都不会重放旧工具调用，后续命令仍需重新审批。
 
 恢复沿用记录的后端、模型、目录和执行配置快照，当前更严格的预算、执行器、审批与保存策略优先。目录缺失时停止；更换后端要显式 fork。第三方适配器声明并实现 native resume 时可通过 `resumeRef` 复用；原生引用失效可显式使用 `resume --context-only`。
 
@@ -261,9 +269,9 @@ sayrun migrate --from /absolute/path/.runtime/dsh --apply
 
 退出码：`0` 完成，`1` 运行失败，`2` 参数/配置错误，`3` 拒绝，`4` 预算/模型输出上限，`5` 后端能力/认证不可用，`130` 取消。命令自己的失败状态独立记录，后续修复成功不一定意味着整个任务失败。
 
-## 适配器与开发
+## 外部后端
 
-后端契约见 `src/contracts/backend.ts`，外部进程插件协议见 [ADAPTERS.md](ADAPTERS.md)。外部插件需要显式注册；不提供插件市场或自动安装任意包。
+外部插件需要显式注册；不提供插件市场或自动安装任意包。适配器作者请阅读[后端协议参考](../reference/backend-protocol.md)。
 
 ```zsh
 sayrun backend add custom --manifest /absolute/path/adapter.json
@@ -272,55 +280,4 @@ sayrun ask --backend custom "任务"
 sayrun backend remove custom
 ```
 
-| 目录 | 职责 |
-| --- | --- |
-| `src/cli/`、`src/cli/commands/` | CLI 主流程、参数 / 输入 / 输出及各类管理命令 |
-| `src/application/` | 任务协调、分类编排、审批顺序、预算与取消 |
-| `src/contracts/` | 后端、执行器、UI、配置与历史的共享类型契约 |
-| `src/backends/` | 后端选择、能力准入与协议；`dsh/` 集中 DSH 的 composition、RPC 和插件，`process/` 接入外部进程 |
-| `src/execution/` | 本地 zsh 执行、命令校验、超时、环境和输出限制 |
-| `src/terminal/` | UI 工厂、纯文本 / OpenTUI、Markdown 展示、预览和输出清理 |
-| `src/config/` | 默认值、配置校验、TOML 加载 / 保存、来源和项目信任 |
-| `src/history/` | 会话存储、运行写入、上下文、导入导出、GC、索引及 DSH 迁移 |
-| `src/platform/` | 安装路径、项目定位、原子文件、Bun 定位与 shell 安装 |
-
-逐文件说明见 [ARCHITECTURE.md](ARCHITECTURE.md)。
-
-```zsh
-npm install
-npm run typecheck
-npm run build
-npm test
-npm run test:pty
-npm run test:package
-npm pack --dry-run
-```
-
-Node 源码测试通过开发依赖 `tsx` 加载 TypeScript；消费者运行构建后的 JavaScript，不需要 TypeScript 或 tsx。自动测试使用后端替身，不调用外部模型。PTY 需要创建伪终端和 Unix socket。打包测试在临时 prefix 实际全局安装，并在仓库外、安装目录只读的情况下验证 UI 和 shell；需要 registry 或完整 npm 缓存。离线用 `TERMINAL_AGENT_PACKAGE_TEST_OFFLINE=1`，可通过 `TERMINAL_AGENT_PACKAGE_TEST_CACHE` 指定缓存。
-
-当前仍按设计后续阶段保留：Codex / Claude / 自建 harness、SSH executor、独立运行时安装包和 Homebrew / registry 发布。项目原始设计文档见 [product-and-backend-design.md](product-and-backend-design.md)，实际实现范围以本文和测试为准。
-
-## 构建与发包
-
-源码与构建脚本使用 TypeScript，逐文件职责和架构建议见 [ARCHITECTURE.md](ARCHITECTURE.md)。`npm run typecheck` 使用 `tsc --noEmit` 检查类型；`npm run build` 先检查类型，再使用项目固定版本的 Bun，将 CLI、OpenTUI 和 DSH bridge 分别转译并打包到 `dist/sayrun.js`、`dist/ui-opentui.js`、`dist/command-opentui.js` 和 `dist/terminal-tool.js`，执行语法压缩、空白压缩和标识符改名（minify / uglify），不生成 source map。OpenTUI 保留独立模块，非 TTY 管理命令和纯文本模式不会提前加载 Bun FFI；交互终端的管理命令由 Bun 运行共用 OpenTUI 展示层。zsh 集成作为必要的运行资产生成，去除注释并引用构建后的 CLI。构建失败保留上一次成功产物。
-
-`prepack` 和 `prepublishOnly` 都调用构建，分别覆盖 `npm pack` 和 `npm publish`。发布白名单包含 `dist/` 和 README 使用的 `docs/images/approval-preview.png`；npm 还会自动包含根目录 `README.md` 和必需的 `package.json`。README 通过公共 npm CDN 加载这张 PNG，不依赖 GitHub 仓库是否公开。其余详细文档、SVG、源码、构建脚本、测试和 TypeScript 配置不进入安装包。`dist/` 不提交到 Git，消费者安装 tarball 不需要源码或执行构建。
-
-```zsh
-npm run build
-npm run test:build
-npm pack --dry-run
-npm pack
-# 确认发布目标和账号后再手动 npm publish；本仓库不会自动发布。
-```
-
-npm 包名为 `sayrun-shell`，CLI 名称仍为 `sayrun`。`publishConfig` 固定发布到官方 registry，并将访问级别设为 public。手动发布可执行 `npm publish --access=public --registry=https://registry.npmjs.org/`。
-
-`npm publish` 返回成功或 `202 Accepted` 只表示上传已被接收。npm 会在版本公开前扫描，期间可能提示 `Your package is being processed`。发布后应查询官方 registry，确认目标版本及 `latest` 标签都已生效：
-
-```zsh
-npm view sayrun-shell@0.1.2 version --registry=https://registry.npmjs.org/
-npm view sayrun-shell dist-tags --json --registry=https://registry.npmjs.org/
-```
-
-将示例中的版本号替换为本次目标版本。如果持续查不到版本，请登录 npm 维护者账号检查发布状态和通知；公开接口的 404 无法区分等待扫描、人工复核与拦截。README 的图片修复也要随新版本成功发布后，才会在 npm 和公共 CDN 生效。
+开发 Sayrun 本身请从[贡献指南](../../CONTRIBUTING.md)开始；构建与测试见[开发文档](../development/testing.md)。

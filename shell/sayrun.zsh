@@ -4,6 +4,13 @@
 # Keep their callback alive and make source idempotently refresh definitions.
 typeset -gi TERMINAL_AGENT_ENABLED=1
 
+# The owner stays local so exec zsh also starts fresh even with the same PID.
+# Re-sourcing this integration keeps the current shell's identity.
+if [[ "${_TERMINAL_AGENT_SHELL_OWNER:-}" != "$$" || -z "${TERMINAL_AGENT_SHELL_ID:-}" ]]; then
+  typeset -gx TERMINAL_AGENT_SHELL_ID="$$-$RANDOM-$RANDOM"
+  typeset -g _TERMINAL_AGENT_SHELL_OWNER="$$"
+fi
+
 typeset -g TERMINAL_AGENT_ROOT="${${(%):-%x}:A:h:h}"
 # Resolve Node once; the command path and arguments are never eval'd.
 typeset -g TERMINAL_AGENT_NODE="${TERMINAL_AGENT_NODE:-${commands[node]}}"

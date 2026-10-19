@@ -1,4 +1,8 @@
-# AgentBackend v1
+# 后端协议参考：AgentBackend v1
+
+[文档索引](../README.md) · 分类：接口参考 · 状态：当前
+
+本文面向后端适配器作者，定义 host-tools 能力、进程传输、请求与事件语义。共享类型见 [`src/contracts/backend.ts`](../../src/contracts/backend.ts)，接入命令见[使用手册](../guide/usage.md#外部后端)。
 
 Coordinator、执行器、历史和 UI 不读取 DSH 原始事件；新后端实现 `src/contracts/backend.ts` 即可复用相同流程。目前内置 DSH，没有内置模型循环。
 

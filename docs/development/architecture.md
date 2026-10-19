@@ -1,5 +1,9 @@
 # 项目结构与职责
 
+[文档索引](../README.md) · 分类：开发维护 · 状态：当前
+
+本文面向修改 Sayrun 源码的开发者，记录当前模块职责、依赖约束与运行时结构。环境准备和测试命令见[构建与测试](testing.md)，后端传输细节见[后端协议参考](../reference/backend-protocol.md)。
+
 生产源码和构建脚本使用 TypeScript，发布时由 Bun 转译为 JavaScript。源码按功能归类；当前实际结构如下。
 
 ## 目录概览
@@ -37,7 +41,7 @@ shell/
   sayrun.zsh
 scripts/
   build.ts
-docs/                             # 使用、架构、适配器与原始设计文档
+docs/                             # guide、reference、development、archive 与文档索引
 test/
   *.test.mjs                      # Node 测试，tsx 加载 TS 源码
   ui.test.ts                      # Bun / OpenTUI 测试
@@ -112,6 +116,7 @@ test/
 | `src/config/load.ts` | TOML 读写、用户 / profile / 项目 / 环境 / CLI 合并、来源记录、摘要信任和保存备份。 |
 | `src/history/store.ts` | 安装身份、会话元数据、文件锁、事件读取、查询、导入、GC 和 SQLite 索引重建。 |
 | `src/history/run-writer.ts` | 单次运行的状态、事件追加、fsync、命令输出、结果与最终状态写入。 |
+| `src/history/shell-session.ts` | 按 shell 实例、项目与后端绑定当前原生会话；排除归档、导入和只读记录。 |
 | `src/history/context.ts` | 选择可见历史，裁剪继续任务时发送的上下文。 |
 | `src/history/export.ts` | Markdown 导出与可预览的敏感信息遮盖。 |
 | `src/history/migrate-dsh.ts` | 验证 DSH v4、转换执行事实、备份原始字节、去重导入，保留旧数据。 |
@@ -163,16 +168,18 @@ test/
 | `test/build.test.mjs` | 独立 JS 入口、构建资产、插件 exports 和生成的 shell 集成。 |
 | `test/ui.test.ts` | Bun 下 OpenTUI 的渲染、审批、编辑、追问、管理交互、窄窗口和滚动。 |
 | `test/commands-pty.py` | 构建后的管理界面、setup 写入/取消、任务输入交接和历史选择的真实终端回归。 |
+| `test/dsh-native-smoke.mjs` | 使用本机 DSH 与本地模拟模型服务，验证原生会话跨进程恢复。 |
+| `test/export.test.mjs` | 公开源码快照的白名单、排除项、目标路径和符号链接检查。 |
 | `test/fixture-dsh.mjs` / `test/fixture-backend.mjs` | 可由普通 Node 执行的确定性协议替身，不调用外部模型。 |
 | `test/terminal-pty.py` | 真实 PTY 中的 zsh 与 CLI，覆盖两种 UI、审批、拒绝、取消、问答、编辑与重新加载。 |
 | `test/history-pty.py` | 真实终端中的历史查看、恢复与上下文分支。 |
 | `test/package-install.py` | 清理旧 dist、重新打包、安装到临时 prefix，在仓库外与只读安装目录验证 CLI / UI / shell。 |
-| `README.md` / `docs/USAGE.md` / `docs/ADAPTERS.md` | 项目首页、完整使用手册，以及外部进程后端协议。 |
-| `docs/ARCHITECTURE.md` | 本文：实际目录、逐文件职责、依赖约束与后续建议。 |
-| `.npmignore` | 显式排除源码、docs、测试和开发文件；发布白名单仅声明 dist；npm 自动附带根目录 README 和 package.json。 |
+| `README.md` / `docs/README.md` | 项目首页与按用途分类的文档入口；详细说明按指南、参考、开发维护与历史归档组织。 |
+| `docs/development/architecture.md` | 本文：实际目录、逐文件职责、依赖约束与后续建议。 |
+| `.npmignore` / `package.json#files` | 排除开发文件；发布白名单保留 dist 和 README 预览 PNG，npm 自动附带根 README、许可证及 package.json。 |
 | `.gitignore` | 忽略 dist、node_modules、运行状态、日志与 tarball。 |
 
-`dist/`、`node_modules/`、`.runtime/`、`*.tgz` 是构建 / 安装 / 运行产物。`docs/product-and-backend-design.md` 是本地保留的原始设计，与其他文档一起保存在仓库中。实际范围以实现与测试为准。
+`dist/`、`node_modules/`、`.runtime/`、`*.tgz` 是构建 / 安装 / 运行产物。`docs/archive/product-and-backend-design.md` 保留历史设计依据与归档时的提案，不作为当前实现说明。实际范围以实现与测试为准。
 
 ## 依赖约束
 
@@ -185,9 +192,9 @@ test/
 - JSONL 和输出文件是权威事实，SQLite 是可重建索引。外部消息和旧历史仍需要运行时校验，TypeScript 不替代协议检查。
 - Node CLI 与 Bun UI 独立构建、按需加载。源码测试与发布安装测试分别验证 TS 逻辑和 JS 分发路径。
 
-## 后续演进
+## 演进原则
 
-当前目录拆分已经实施。进一步调整应由实际复杂度驱动：
+当前保留单 npm 包，不引入依赖注入框架或通用事件总线。以下是后续修改时的判断依据，不表示这些拆分已经实施：
 
 1. 将 cli/main 中的恢复流程提取成独立应用用例，把具体依赖的创建集中到组合入口。
 2. store 的锁、GC、索引继续增长时再独立；应用层可以只依赖开始 / 追加 / 保存结果 / 结束的小型历史接口。
@@ -195,29 +202,17 @@ test/
 4. 增加第二个真实后端前，统一后端契约测试，进一步完善外部 JSON 与历史事件的版本化解析。
 5. 测试按领域归档，并维护随代码版本更新的设计文档。
 
-当前保留单 npm 包，不引入依赖注入框架或通用事件总线。
-
-## 构建与验证
+## 构建与运行时
 
 ```text
 tsc --noEmit       → 检查 TypeScript
-Bun.build          → dist/sayrun.js  （Node）
+Bun.build          → dist/sayrun.js          （Node）
                    → dist/ui-opentui.js      （Bun，任务交互）
                    → dist/command-opentui.js （Bun，管理命令）
                    → dist/terminal-tool.js   （Node / DSH 插件）
 shell 源文件       → dist/sayrun.zsh
 ```
 
-源码使用 `.ts` 相对导入，Bun 生成并压缩 JS；typescript、类型包与 tsx 均是开发依赖。Node 测试保留 `.mjs`，通过 tsx 加载源码；Python 仅用于终端与安装回归且只用标准库。消费者运行构建后的 JS。
+源码使用 `.ts` 相对导入；Bun 转译并压缩 JavaScript，不生成 source map。CLI、两类 UI 和 DSH 插件独立构建，zsh 集成作为运行资产生成并去除注释。构建使用暂存目录，失败时保留上次成功产物。
 
-```sh
-npm install
-npm run typecheck
-npm run build
-npm test
-npm run test:pty
-npm run test:package
-node dist/sayrun.js --help
-```
-
-npm test 和 PTY 测试先构建，安装测试会清理旧产物并验证 npm pack 的自动构建。安装测试需要 registry 或完整缓存；离线可设置 `TERMINAL_AGENT_PACKAGE_TEST_OFFLINE=1`。
+Node CLI 与 Bun UI 按需加载，非 TTY 管理命令和纯文本模式不会提前加载 Bun FFI。TypeScript、类型包和 tsx 属于开发依赖，消费者只运行构建后的 JavaScript。环境要求、构建入口和测试选择统一见[构建与测试](testing.md)，包内容与发布钩子见[发布文档](releasing.md#发布包内容)。

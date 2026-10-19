@@ -41,6 +41,9 @@ test('published README images use public npm CDN URLs and are included in the ta
   });
   assert.equal(packed.status, 0, packed.stderr);
   const files = JSON.parse(packed.stdout)[0].files.map((file) => file.path);
+  assert.ok(files.includes('LICENSE'), 'npm package must include its license');
+  assert.ok(files.every((path) => ['package.json', 'README.md', 'LICENSE', 'CHANGELOG.md'].includes(path)
+    || path.startsWith('dist/') || path === 'docs/images/approval-preview.png'), 'unexpected file in npm package');
   const { name } = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
   const readme = await readFile(join(packageRoot, 'README.md'), 'utf8');
   const images = [...readme.matchAll(/!\[[^\]]*\]\(([^\s)]+)\)/g)];

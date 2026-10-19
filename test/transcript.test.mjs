@@ -5,7 +5,7 @@ import { formatConclusion, renderMarkdown, StepTranscript } from '../src/termina
 import { safeText } from '../src/terminal/display.ts';
 
 test('final answers render Markdown with emphasis and preserve all content at narrow widths', () => {
-  const text = '**该域名暂时无法解析。**\n\n### 关键证据\n- 本地 DNS 返回 `NXDOMAIN`。\n- 公共 DNS 没有返回 A 记录。\n\n```sh\nnslookup oneui-view-bridge.uat.ennew.com\n```\n\n' + '完整结论'.repeat(1200) + 'END_OF_ANSWER';
+  const text = '**该域名暂时无法解析。**\n\n### 关键证据\n- 本地 DNS 返回 `NXDOMAIN`。\n- 公共 DNS 没有返回 A 记录。\n\n```sh\nnslookup service.example.invalid\n```\n\n' + '完整结论'.repeat(1200) + 'END_OF_ANSWER';
   const result = formatConclusion(text, { output: { columns: 44 }, color: true, commands: 2, elapsed: 12000 });
   assert.match(result, /\x1b\[1m该域名/);
   assert.match(result, /\x1b\[33mNXDOMAIN/);

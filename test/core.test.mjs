@@ -104,6 +104,25 @@ test('classification only accepts confident structured routing, never rewritten 
   }
 });
 
+test('zsh keeps conversation identity across commands and reloads, and isolates nested shells', () => {
+  const source = join(projectRoot, 'shell/sayrun.zsh');
+  const script = `source "$1" >/dev/null
+    first=$TERMINAL_AGENT_SHELL_ID
+    printf shell-command >/dev/null
+    source "$1" >/dev/null
+    [[ "$first" == "$TERMINAL_AGENT_SHELL_ID" ]] || exit 1
+    child=$(/bin/zsh -f -i -c 'source "$1" >/dev/null; print -r -- "$TERMINAL_AGENT_SHELL_ID"' child "$1")
+    [[ "$first" != "$child" && -n "$child" ]] || exit 2
+    print identity-ok`;
+  const result = spawnSync('/bin/zsh', ['-f', '-i', '-c', script, 'identity-test', source], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), 'identity-ok');
+  const replacement = spawnSync('/bin/zsh', ['-f', '-i', '-c', `source "$1" >/dev/null
+    export BEFORE_EXEC=$TERMINAL_AGENT_SHELL_ID
+    exec /bin/zsh -f -i -c 'source "$1" >/dev/null; [[ "$BEFORE_EXEC" != "$TERMINAL_AGENT_SHELL_ID" ]]' replaced "$1"`, 'identity-test', source], { encoding: 'utf8' });
+  assert.equal(replacement.status, 0, replacement.stderr);
+});
+
 test('active budget excludes human waiting time', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   let expired = false;

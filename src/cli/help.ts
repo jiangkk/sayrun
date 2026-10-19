@@ -9,6 +9,7 @@ export function commandHelp(version: string): ReportLine[] {
     { text: 'sayrun                           输入任务，完成即退出' },
     { text: 'sayrun ask "帮我检查当前目录"      直接开始一个任务' },
     { text: 'sayrun ask --backend dsh --profile ops "任务"' },
+    { text: 'sayrun ask --new "新任务"          在当前 shell 开始新对话' },
     { text: 'sayrun -- "history"               强制作为任务文本' },
     { text: 'sayrun resume <id> | --last [--prompt "继续请求"]' },
     { text: '' }, section('环境与设置'),
@@ -35,6 +36,7 @@ export function commandHelp(version: string): ReportLine[] {
     { text: '' }, section('在当前 Zsh 启用'),
     { text: 'eval "$(sayrun shell init zsh)"' },
     hint('每条命令均需审批。非 TTY 只读管理可用，ask 不执行。'),
+    hint('同一 shell 和项目延续会话；新 zsh 实例独立，普通 shell 命令不切断对话。'),
     hint('交互终端默认使用 OpenTUI；--json 输出原始数据，ui.mode=plain 使用纯文本。'),
   ];
 }

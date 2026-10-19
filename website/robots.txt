@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://jiangkk.github.io/sayrun-site/sitemap.xml
+Sitemap: https://jiangkk.github.io/sayrun/sitemap.xml

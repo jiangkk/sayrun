@@ -1,8 +1,19 @@
-# Sayrun：可插拔后端与产品化设计
+# Sayrun：可插拔后端与产品化设计（历史归档）
 
-状态：待评审；日期：2026-10-16。
+[文档索引](../README.md) · 分类：历史归档 · 状态：已归档
 
-本文是完整产品化设计，尚未实现的命令、配置和接口仍属提案；当前已实现的能力以 README 为准。npm 包元数据现名为 `sayrun-shell`，已提供 tarball 全局安装、独立用户运行目录、直接任务入口和 `shell init zsh`；尚未发布到 registry。`setup`、多后端和统一历史仍为后续规划。
+初稿：2026-10-16；归档：2026-10-19。
+
+本文保留早期产品与后端边界的设计依据，正文同时包含归档时的实现状态和未实现提案，不再随当前实现更新。当前行为见[使用手册](../guide/usage.md)，模块职责见[架构文档](../development/architecture.md)，接口见[后端协议参考](../reference/backend-protocol.md)及 `src/contracts/`。后续方案应另建有明确状态的设计文档，不在本文追加路线承诺。
+
+| 范围 | 归档时状态（2026-10-19） |
+| --- | --- |
+| npm 分发、setup、zsh 集成与诊断 | 已实现，包名为 `sayrun-shell` |
+| DSH、审批执行、统一历史与迁移 | 已实现 |
+| 同一 shell 多轮对话、DSH 原生恢复 | 已实现；恢复失败明确报错，可显式创建上下文分支 |
+| 外部进程后端协议 | 已实现，需用户显式注册可信本地适配器 |
+| Codex、Claude、自建模型循环 | 尚未内置 |
+| SSH executor、Homebrew、独立可执行分发 | 后续提案 |
 
 ## 1. 设计结论
 
@@ -66,7 +77,7 @@ Executor 同样保留接口边界：V1 只有 `local-zsh`，以后增加 SSH exe
 
 | 后端 | 计划接入方式 | 评审时的状态与限制 |
 | --- | --- | --- |
-| DSH | `sdk-minimal` 的 stdio JSON-RPC + 自定义桥接插件 | 当前原型已运行；持久恢复需另做验证 |
+| DSH | `sdk-minimal` 的 stdio JSON-RPC + 自定义桥接插件 | 使用 `session/resume` 原生恢复；本机 DSH 已通过离线跨进程历史验证 |
 | Codex | 优先本地 `codex app-server`，映射会话、事件与自定义工具 | 官方提供嵌入协议；动态工具接口标记为 experimental，须固定兼容版本并验证工具限制 |
 | Claude | 优先 Claude Agent SDK + 自定义工具 / MCP bridge | 官方提供程序化 agent 与权限接口；尚未实现适配器 |
 | 自建 harness | 实现相同契约；后端内部持有 LLM provider 与工具循环 | 设计预留，不要求复制 DSH 协议 |
@@ -162,7 +173,7 @@ interface AgentBackend {
 
 ### 3.3 传输与适配方式
 
-- DSH 适配器吸收当前 `src/dsh.mjs`、`src/rpc.mjs`、`dsh/terminal-tool.mjs` 的厂商细节。Unix Socket、随机令牌和 `/execute` 属于这个适配器的桥接实现，不成为所有后端的强制协议。
+- DSH 适配器的 composition、RPC 和桥接插件位于 `src/backends/dsh/`。Unix Socket、随机令牌和 `/execute` 属于这个适配器的桥接实现，不成为所有后端的强制协议。
 - Codex 适配器映射 app-server 的原生握手、请求和通知，不能直接套用当前 DSH 的 `LineRpc`。例如其文档中的协议省略 `jsonrpc` 字段，且握手与方法名不同。
 - Claude 适配器在 SDK worker 中转换事件和自定义工具调用；SDK 的原生工具必须按准入规则收敛。
 - 第三方适配器 V1 使用本地进程插件：manifest 声明协议版本、可执行文件、参数与环境变量白名单；stdio 只传 JSONL 协议，诊断走 stderr。Coordinator 用 argv 启动，避免拼接 shell 字符串。
@@ -178,9 +189,9 @@ interface AgentBackend {
 2. **首个可分发版本**：发布 npm 包，安装包暴露稳定的 `sayrun` 可执行文件，依赖固定版本的 Bun / OpenTUI；用户无需把仓库路径写进 zshrc。
 3. **稳定版**：提供按系统架构打包的安装包和 Homebrew 分发，包含所需运行时与原生资产；版本切换应能回退。先验证 OpenTUI FFI 和资源加载，再承诺独立包不需要 Node / Bun。
 
-后端单独安装或由用户选择后安装；使用 DSH 不要求安装 Codex、Claude。安装 Sayrun 不代表安装或登录所有 agent 产品。当前使用本地 tarball 全局安装；包名注册和公开发布前不提供 registry / brew 正式安装承诺。
+后端单独安装；使用 DSH 不要求安装 Codex、Claude。Sayrun 已通过 npm 包 `sayrun-shell` 分发，也可从源码构建 tarball。安装 Sayrun 不会安装或登录 DSH，当前没有 Homebrew 分发。
 
-### 4.2 首次使用流程（拟议）
+### 4.2 首次使用流程
 
 ```text
 安装发布包
@@ -334,7 +345,7 @@ timeout_seconds = 60
 
 密钥采用环境变量名、系统凭证库引用或厂商官方认证存储；配置中不写明文密钥。`config show` 只展示引用和是否可用。不会直接读取桌面 App 的内部 token 来实现“复用登录”。具体登录与用量规则由适配器说明。
 
-恢复会话默认沿用记录中的后端、模型、目录和执行配置快照，新的用户硬性限制仍优先。显式覆盖要写入新 run；不能因为默认后端变更而将旧会话静默发给另一个服务。
+显式 `resume` 默认沿用记录中的后端、模型、目录和执行配置快照，新的用户硬性限制仍优先。同一 shell 自动续接使用当前目录与当前生效配置，并按后端分别维护会话；每轮生效配置写入新 run，不把旧后端的上下文静默发给另一个服务。
 
 `NO_COLOR`、终端能力与 `--no-color` 共同影响展示；颜色选项不允许未过滤的模型 / 命令 ANSI 序列直通终端。
 
@@ -348,11 +359,11 @@ timeout_seconds = 60
 
 ### 7.1 三种 ID
 
-- `sessionId`：用户看到的逻辑会话，可含多次显式恢复。
+- `sessionId`：用户看到的逻辑会话，可含多轮自动续接与显式恢复。
 - `runId`：一次用户请求及随后的 agent 工作；本次完成即退出面板。
 - `nativeRef`：适配器保存的 DSH sessionId / Codex threadId 等，不作为通用会话 ID。
 
-新任务创建新 session 和 run；恢复旧任务创建同 session 的新 run。`--last` 默认限定当前机器与项目，找不到时展示选择器，不自动恢复另一个目录的最近任务。
+加载 zsh 集成后，同一 shell 实例、项目和后端默认沿用活跃 session，每次提问创建新 run。普通 shell 命令不切断会话；新 zsh（包括嵌套和 `exec zsh`）独立，重新 source 集成保留当前会话。同一 Git 项目的子目录共用会话，项目间分别保存绑定。`sayrun ask --new "任务"` 新建并切换活跃会话。未加载集成的独立调用默认新建；关闭历史时不自动续接。`--last` 默认限定当前机器与项目，找不到时展示选择器，不自动恢复另一个目录的最近任务。
 
 ### 7.2 数据目录
 
@@ -409,9 +420,9 @@ $XDG_RUNTIME_DIR/terminal-agent/    # 临时 IPC；缺省使用私有临时目�
 **查看 / 回放不执行任何命令。** 恢复是发送一个新的用户请求，不能重放旧工具调用。
 
 - 后端支持 native resume 且引用存在：加载原生会话，再开启新 run。
-- 原生状态丢失或后端只支持 context-only：先展示降级说明，创建基于可见上下文的新分支，保留 parentSessionId，不伪装成精确恢复。
+- 原生恢复失败：明确报错，不自动提交替代请求；用户可用 `--context-only` 显式创建可见上下文分支，或用 `ask --new` 新建对话。后端只支持 context-only 时展示说明并创建分支，保留 parentSessionId。
 - 后端更换：走 fork，而不是将 DSH 原生日志直接交给 Codex。可迁移用户消息、执行事实、已有结论；隐藏推理与厂商内部状态不承诺迁移。
-- 上下文过长：显示将发送的范围，按预算选择结论与关键执行事实；额外调用模型生成摘要属于显式功能，不在浏览历史时偷偷调用。
+- 原生会话的上下文压缩由后端负责，DSH 的 sdk-minimal 已启用自动 compaction，sayrun 不重复实现摘要压缩。显式上下文分支显示将发送的范围，按预算选择结论与关键执行事实；浏览历史不调用模型。
 - 目录不存在、目标机器不同或模型不可用：恢复前提示处理，不静默换目录、换目标或换服务。
 - 普通命令在每次独立 shell 中运行；恢复上下文不等于恢复上次的进程、环境变量、cd 状态或终端进程。
 
@@ -436,21 +447,23 @@ run 状态：`starting → thinking ↔ awaiting_approval / awaiting_input / exe
 
 CLI 退出码建议：0 正常完成；1 运行失败；2 参数 / 配置错误；3 用户拒绝；4 预算或输出上限导致任务未完整结束；5 后端或认证不可用；130 用户取消。命令自己的退出码写入步骤记录；一次命令失败而后续补救成功，不直接等同整个任务失败。
 
-## 9. 从当前原型迁移
+## 9. 早期原型的迁移记录
 
-| 当前代码 / 数据 | 目标归属 |
+以下是早期 JavaScript 原型的迁移对应关系，当前 TypeScript 结构见 [架构文档](../development/architecture.md)。
+
+| 早期代码 / 数据 | 迁移后的职责 |
 | --- | --- |
 | `src/agent.mjs` 中 DSH 的创建与原始事件分支 | `backends/dsh/` 适配器 |
-| `src/agent.mjs` 中审批、预算、取消与执行顺序 | `core/coordinator` 和 `core/tool-broker` |
+| `src/agent.mjs` 中审批、预算、取消与执行顺序 | `src/application/run-task.ts` |
 | `src/dsh.mjs`、`src/rpc.mjs`、`dsh/terminal-tool.mjs` | DSH 专属运行时与桥接 |
 | `src/classify.mjs` | 分类策略接口 + DSH 分类适配 |
 | `src/ui*.mjs`、`src/transcript.mjs` | 保留展示层，消费统一类型 |
-| `src/execute.mjs` | `executors/local-zsh` |
+| `src/execute.mjs` | `src/execution/` |
 | 项目 `.runtime/dsh/sessions` | 通过显式迁移导入统一索引，保留原生恢复映射 |
 
 旧记录迁移使用 `sayrun migrate --from /absolute/path/.runtime/dsh --dry-run`，确认后 `--apply`：校验格式、备份、逐条转换并记录来源。按来源路径 + nativeId / 内容摘要去重，重复执行不重复导入；保留无法识别的数据，不删除旧目录。
 
-优先为旧会话提供查看与检索。DSH 原生恢复未经验证时标为不可用，不靠迁移文件就宣称支持恢复。迁移和用户存储就绪后，运行时不再依赖代码仓库位置。
+优先为旧会话提供查看与检索。迁移记录保留 context-only 标记；原生恢复需要当前 SDK 与仍存在的原生历史，缺失时明确失败。迁移和用户存储就绪后，运行时不再依赖代码仓库位置。
 
 ## 10. 实施顺序和验收
 
@@ -486,7 +499,7 @@ CLI 退出码建议：0 正常完成；1 运行失败；2 参数 / 配置错误�
 | 第二个后端 | Codex app-server，先以能力准入实验验证 |
 | 后端原生执行 | 暂缓，避免编辑、审批和目标语义不一致 |
 | 历史归属 | 统一产品历史 + 后端原生引用，文件为内容来源，索引可重建 |
-| 继续任务 | 显式 resume；任务结束仍退出，不变成常驻聊天 |
+| 继续任务 | 同一 shell、项目和后端自动续接；独立调用支持显式 resume，任务结束返回提示符 |
 | 跨后端迁移 | 创建带来源的新分支，只迁移可见上下文 |
 | 默认存储 | 用户目录；兼容旧 DSH home，不继续绑定仓库 |
 | 默认清理 | 手动 GC，自动清理由用户开启 |
@@ -496,10 +509,9 @@ CLI 退出码建议：0 正常完成；1 运行失败；2 参数 / 配置错误�
 
 ## 12. 资料与验证边界
 
-以上产品边界来自当前原型与本次对话；模块和协议由本设计提出。外部事实核实于 2026-10-16：
+本文记录 Sayrun 的产品边界与后续接口提案。以下外部资料用于评估尚未实现的适配器，不代表已完成兼容验证：
 
 - [Codex app-server 官方文档](https://learn.chatgpt.com/docs/app-server)：支持程序化会话和事件；动态工具接口属于实验能力。
 - [Claude Agent SDK 官方概览](https://code.claude.com/docs/en/agent-sdk/overview)、[自定义工具](https://code.claude.com/docs/en/agent-sdk/custom-tools)、[权限](https://code.claude.com/docs/en/agent-sdk/permissions)：提供接入入口，适配器仍须验证有效工具集合与版本。
-- 本机 `codex app-server --help` 已确认存在该入口。未执行模型请求、创建厂商会话或改写认证配置。本机 Claude CLI 的帮助命令因尝试写入用户配置而被文件权限阻止，因此未做其版本兼容验证，也不据此推断 SDK 可用性。
 
-公开 registry 发布、记录迁移和其他真实后端尚未完成；已实现的 npm 安装与 CLI 以 README 为准。
+npm 分发、旧记录迁移和 DSH 原生恢复已实现；其他真实后端、SSH 执行器及独立二进制分发仍属于后续工作。发布过程见[发布文档](../development/releasing.md)。
