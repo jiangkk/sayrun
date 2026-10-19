@@ -116,6 +116,7 @@ with tempfile.TemporaryDirectory(prefix="ta-npm-") as temp:
     shutil.rmtree(ROOT / "dist", ignore_errors=True)
     packed = json.loads(run(["npm", "pack", "--silent", "--json", "--pack-destination", str(temp), "--cache", CACHE], cwd=ROOT))[0]
     assert packed["name"] == "sayrun-shell"
+    assert "LICENSE" in {entry["path"] for entry in packed["files"]}
     paths = {entry["path"] for entry in packed["files"]}
     assert {"dist/sayrun.js", "dist/ui-opentui.js", "dist/command-opentui.js", "dist/terminal-tool.js", "dist/sayrun.zsh"} <= paths
     assert {path for path in paths if path.startswith("docs/")} == {"docs/images/approval-preview.png"}

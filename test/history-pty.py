@@ -76,6 +76,7 @@ with tempfile.TemporaryDirectory(prefix="ta-history-", dir="/tmp") as temp:
                TERMINAL_AGENT_DSH_BIN=str(ROOT / "test/fixture-dsh.mjs"), TERMINAL_AGENT_FIXTURE_TRACE=str(trace))
     env.pop("TERMINAL_AGENT_HOME", None)
     env.pop("TERMINAL_AGENT_FIXTURE_SCENARIO", None)
+    env.pop("TERMINAL_AGENT_SHELL_ID", None)
 
     def cli(*args):
         result = subprocess.run(["node", str(CLI), *args], cwd=cwd, env=env, text=True, capture_output=True, timeout=15)
@@ -112,6 +113,21 @@ with tempfile.TemporaryDirectory(prefix="ta-history-", dir="/tmp") as temp:
     cli("config", "set", "agent.backend", "unregistered-default")
     task(["resume", "--last", "--prompt", "显式继续检查"])
     rows = json.loads(cli("sessions", "list", "--json"))
+    assert len(rows) == 1 and rows[0]["sessionId"] == original
+    events = json.loads(cli("sessions", "show", original, "--json"))["events"]
+    assert sum(e["type"] == "run.started" for e in events) == 2
+    assert sum(e["type"] == "execution.started" for e in events) == 4
+    assert not any(e["type"] == "context.imported" for e in events)
+    calls = [json.loads(line) for line in trace.read_text().splitlines()]
+    resumes = [m for m in calls if m["method"] == "session/resume"]
+    prompts = [m for m in calls if m["method"] == "session/prompt"]
+    assert len(resumes) == 1 and resumes[0]["params"]["sessionId"] == prompts[0]["params"]["sessionId"]
+    assert prompts[0]["params"]["sessionId"] == prompts[1]["params"]["sessionId"]
+    assert sum(m["method"] == "shutdown" for m in calls) == 2
+    print("PASS: explicit native resume keeps session identity and appends only new approved commands", flush=True)
+
+    task(["resume", original, "--context-only", "--prompt", "显式上下文分支"])
+    rows = json.loads(cli("sessions", "list", "--json"))
     assert len(rows) == 2
     fork = next(m for m in rows if m["sessionId"] != original)
     assert fork["parentSessionId"] == original and fork["backend"] == "dsh"
@@ -119,6 +135,44 @@ with tempfile.TemporaryDirectory(prefix="ta-history-", dir="/tmp") as temp:
     assert sum(e["type"] == "execution.started" for e in events) == 2
     assert any(e["type"] == "context.imported" and "VERIFIED_RESULT" in e["text"] for e in events)
     calls = [json.loads(line) for line in trace.read_text().splitlines()]
-    assert sum(m["method"] == "session/prompt" for m in calls) == 2
-    assert not any(m["method"] == "session/resume" for m in calls)
-    print("PASS: explicit resume creates a context branch, pins backend, executes only new approved commands", flush=True)
+    assert sum(m["method"] == "session/prompt" for m in calls) == 3
+    assert sum(m["method"] == "session/resume" for m in calls) == 1
+    print("PASS: explicit context-only resume creates a visible-history branch", flush=True)
+
+    cli("config", "set", "agent.backend", "dsh")
+    env["TERMINAL_AGENT_SHELL_ID"] = "shell-conversation-one"
+    task(["ask", "同一 shell 第一问"])
+    active = json.loads(cli("sessions", "list", "--json"))[0]["sessionId"]
+    task(["ask", "刚才那个继续检查"])
+    events = json.loads(cli("sessions", "show", active, "--json"))["events"]
+    assert sum(e["type"] == "run.started" for e in events) == 2
+    assert any("NATIVE_TURN_2" in e.get("text", "") for e in events)
+    assert not any(e["type"] == "context.imported" for e in events)
+    count = len(json.loads(cli("sessions", "list", "--json")))
+    task(["ask", "--new", "新对话"])
+    assert len(json.loads(cli("sessions", "list", "--json"))) == count + 1
+    env["TERMINAL_AGENT_SHELL_ID"] = "shell-conversation-two"
+    task(["ask", "新终端里的提问"])
+    assert len(json.loads(cli("sessions", "list", "--json"))) == count + 2
+    print("PASS: same-shell followups restore persisted state; --new and different shells stay independent", flush=True)
+
+    before = trace.read_text()
+    env["TERMINAL_AGENT_FIXTURE_SCENARIO"] = "resume-fails"
+    term = Terminal(["ask", "恢复失败不应自动变成新会话"], env, cwd)
+    try:
+        term.until("resume_failed")
+        # The CLI reports the failure without submitting a replacement prompt.
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            waited, status = os.waitpid(term.pid, os.WNOHANG)
+            if waited:
+                term.waited = True
+                assert os.waitstatus_to_exitcode(status) != 0
+                break
+            time.sleep(0.05)
+        assert term.waited
+    finally:
+        term.close()
+    calls = [json.loads(line) for line in trace.read_text()[len(before):].splitlines()]
+    assert not any(m["method"] == "session/prompt" for m in calls)
+    print("PASS: failed native restore never silently starts a replacement prompt", flush=True)

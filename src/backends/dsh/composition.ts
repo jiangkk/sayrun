@@ -66,7 +66,14 @@ export function launchDsh({ runtimeHome, patchPath, socketPath, token, cwd, onEv
   return {
     child, rpc,
     diagnostics: () => redactDiagnostics(diagnostics),
-    async stop() {
+    async stop({ graceful = false } = {}) {
+      if (graceful && child.exitCode === null && child.signalCode === null) {
+        await new Promise<void>((resolve) => {
+          const done = () => { clearTimeout(timer); child.removeListener('close', done); resolve(); };
+          const timer = setTimeout(done, 5000);
+          child.once('close', done);
+        });
+      }
       if (child.exitCode === null && child.signalCode === null) {
         try { process.kill(-child.pid!, 'SIGTERM'); } catch {}
         let timer;

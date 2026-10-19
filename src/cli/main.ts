@@ -50,7 +50,7 @@ async function launchUi(argv: string[]): Promise<number> {
   finally { process.removeListener('SIGINT', ignore); process.removeListener('SIGTERM', terminate); }
 }
 function taskOptions(args: string[], force = false) {
-  const parsed = force ? { opts: {}, args } : options(args, { values: ['backend', 'profile', 'model'], flags: ['no-color', 'ephemeral'] });
+  const parsed = force ? { opts: {}, args } : options(args, { values: ['backend', 'profile', 'model'], flags: ['no-color', 'ephemeral', 'new'] });
   if (!parsed.args.join(' ').trim()) throw invalid('请输入任务'); return parsed;
 }
 async function effectiveTask(opts: CliOptions) {
@@ -140,7 +140,7 @@ export async function main(argv = process.argv.slice(2)) {
     await closePresentation();
     for (const warning of loaded.warnings) process.stderr.write(warning + '\n');
     if (!loaded.config.history.enabled && !parsed.opts.ephemeral) write('本工具历史已关闭；DSH 仍可能保存原生会话。\n');
-    return (await runAgent(parsed.args.join(' '), { config: loaded.config, ephemeral: parsed.opts.ephemeral })).exitCode;
+    return (await runAgent(parsed.args.join(' '), { config: loaded.config, ephemeral: parsed.opts.ephemeral, newSession: parsed.opts.new })).exitCode;
   } catch (error) { notice(`${error.code ? `${error.code}：` : ''}${error.message}`, 'red'); return error.exitCode ?? 1; }
   finally { await closePresentation(); }
 }

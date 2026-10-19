@@ -1,0 +1,27 @@
+name: Bug report
+description: 报告安装、终端交互或任务执行问题
+body:
+  - type: markdown
+    attributes:
+      value: 请移除 API Key、业务域名、私人路径和任务内容。安全漏洞请先阅读 SECURITY.md。
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 系统与架构、终端、Node.js、Sayrun 和 DSH 版本。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤与预期行为
+      description: 尽量使用临时目录和可公开的最小示例。
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 可附经过脱敏的错误信息；请勿直接粘贴完整会话导出或配置文件。
+    validations:
+      required: true

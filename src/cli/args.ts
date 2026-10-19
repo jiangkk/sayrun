@@ -3,7 +3,7 @@ import { invalid } from '../errors.ts';
 export interface OptionSpec { values?: readonly string[]; flags?: readonly string[] }
 export type CliOptions = Partial<
   Record<'zshrc' | 'backend' | 'profile' | 'model' | 'from' | 'manifest' | 'prompt' | 'format' | 'output' | 'days' | 'max-total-mb' | 'context' | 'status', string> &
-  Record<'yes' | 'dry-run' | 'temporary' | 'no-shell' | 'live' | 'json' | 'check' | 'effective' | 'project' | 'all' | 'include-classifier' | 'archived' | 'full' | 'redact' | 'preview' | 'apply' | 'last' | 'context-only' | 'no-color' | 'ephemeral', boolean>
+  Record<'yes' | 'dry-run' | 'temporary' | 'no-shell' | 'live' | 'json' | 'check' | 'effective' | 'project' | 'all' | 'include-classifier' | 'archived' | 'full' | 'redact' | 'preview' | 'apply' | 'last' | 'context-only' | 'no-color' | 'ephemeral' | 'new', boolean>
 >;
 export function options(argv: string[], { values = [], flags = [] }: OptionSpec = {}): { opts: CliOptions; args: string[] } {
   const opts: Record<string, string | boolean> = {}, args: string[] = [];

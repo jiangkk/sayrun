@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, readFile, writeFile, symlink, chmod } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, writeFile, symlink, chmod, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -301,6 +301,35 @@ test('native resume rejects old tool request IDs without replaying their side ef
   const peer = fixture([{ ...command, cwd: s.cwd }]);
   await assert.rejects(coordinate(s, peer.backend, { store, resumeMeta: meta, resumeRef: 'old-native', execute: async () => { executions++; return success; } }), /重放旧/);
   assert.equal(executions, 0); assert.equal(peer.info.replies[0].code, 'stale_request');
+});
+
+test('shell conversations append runs, isolate shells and projects, and allow an explicit new conversation', async (t) => {
+  const s = await sandbox(t), connections = [];
+  spawnSync('git', ['init', '-q', s.cwd]);
+  const nested = join(s.cwd, 'nested'), other = join(s.dir, 'other'); await mkdir(nested); await mkdir(other);
+  const backend = { id: 'fixture', apiVersion: 1,
+    probe: async () => ({ available: true, capabilities: dshCapabilities, diagnostics: [] }),
+    connect: async (options) => {
+      connections.push(options);
+      return { nativeRef: options.resumeRef ?? randomUUID(), nativeHome: '/tmp/fixture-native-home',
+        async *run({ runId }) { yield backendEvent(runId, { type: 'run.ended', reason: 'completed' }); },
+        reply: async () => {}, close: async () => {}, interrupt: async () => {} };
+    } };
+  const run = (options = {}) => coordinate(s, backend, { shellId: 'shell-one', ...options });
+  const first = await run(), followup = await run({ cwd: nested });
+  assert.equal(first.sessionId, followup.sessionId); assert.notEqual(first.runId, followup.runId);
+  assert.equal(connections[1].resumeRef, (await new SessionStore({ env: s.env }).resolve(first.sessionId)).nativeRef);
+  assert.equal(connections[1].resumeHome, '/tmp/fixture-native-home'); assert.equal(connections[1].cwd, await realpath(nested));
+  const otherShell = await run({ shellId: 'shell-two' }), otherProject = await run({ cwd: other });
+  assert.notEqual(otherShell.sessionId, first.sessionId); assert.notEqual(otherProject.sessionId, first.sessionId);
+  assert.equal((await run()).sessionId, first.sessionId);
+  const fresh = await run({ newSession: true }); assert.notEqual(fresh.sessionId, first.sessionId);
+  assert.equal((await run()).sessionId, fresh.sessionId);
+  const store = new SessionStore({ env: s.env }), data = await store.read(first.sessionId);
+  assert.equal(data.events.filter((e) => e.type === 'run.started').length, 3);
+  assert.equal(data.events.some((e) => e.type === 'context.imported'), false);
+  await store.update(fresh.sessionId, { archived: true });
+  assert.notEqual((await run()).sessionId, fresh.sessionId);
 });
 
 test('a dead owner lock is recovered once; concurrent writers cannot steal a live lock', async (t) => {

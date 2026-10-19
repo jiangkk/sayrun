@@ -18,7 +18,7 @@ export type HostReply =
       output: string; exitCode: number | null; signal: string | null; timedOut: boolean; cancelled: boolean; truncated: boolean }
   | { requestId: string; kind: 'answer'; text: string; commandApproval: false }
   | { requestId: string; kind: 'error'; code: string; message: string };
-export type ConnectOptions = { cwd: string; targetId: string; model?: string; resumeRef?: string; initialContext?: string; ephemeral: boolean; signal?: AbortSignal };
+export type ConnectOptions = { cwd: string; targetId: string; model?: string; resumeRef?: string; resumeHome?: string; initialContext?: string; ephemeral: boolean; signal?: AbortSignal };
 export interface BackendSession {
   nativeRef?: string;
   nativeHome?: string;

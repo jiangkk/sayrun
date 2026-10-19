@@ -16,6 +16,7 @@ import { loadConfig } from '../config/load.ts';
 import { createBackend } from '../backends/registry.ts';
 import { admitBackend, EventQueue } from '../backends/protocol.ts';
 import { SessionStore } from '../history/store.ts';
+import { ShellSession } from '../history/shell-session.ts';
 import { AgentError } from '../errors.ts';
 import { safeText } from '../terminal/display.ts';
 import { writeJson } from '../platform/atomic-file.ts';
@@ -27,10 +28,12 @@ export interface RunAgentOptions {
   ephemeral?: boolean; resumeMeta?: SessionMeta; initialContext?: string; cwd?: string; config?: Config;
   executor?: Executor; execute?: Executor['execute']; maxCommands?: number; maxSteps?: number;
   maxQuestions?: number; taskTimeoutMs?: number; signal?: AbortSignal; resumeRef?: string; store?: SessionStore;
+  newSession?: boolean; shellId?: string;
 }
 export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
   const { input = process.stdin, output = process.stdout, backend: suppliedBackend,
-    uiFactory = createTerminalUi, ephemeral = false, resumeMeta, initialContext = '' } = options;
+    uiFactory = createTerminalUi, ephemeral = false, initialContext = '' } = options;
+  let { resumeMeta, resumeRef } = options;
   if (!input.isTTY || !output.isTTY) throw new AgentError('tty_required', '审批需要交互式终端，请直接在终端运行');
   const cwd = await realpath(options.cwd ?? process.cwd());
   const config = options.config ?? (await loadConfig({ cwd })).config;
@@ -42,6 +45,7 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
   const targetId = executor.targetId;
   let ui: TerminalUi | undefined, session: BackendSession | undefined, writer: RunWriter | undefined;
   let volatile: string | undefined, store: SessionStore | undefined, fatal: Error | undefined;
+  let shellSession: ShellSession | undefined;
   let closing = false, denied = false, limited = false;
   let commandCount = 0, stepCount = 0, questionCount = 0, conclusion = '', ended = false;
   let status: RunStatus = 'starting';
@@ -71,9 +75,17 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
     const probe = await backend.probe(); admitBackend(probe, { ephemeral }); assertActive();
     if (config.history.enabled && !ephemeral) {
       store = options.store ?? new SessionStore();
+      const shellId = options.shellId ?? process.env.TERMINAL_AGENT_SHELL_ID;
+      if (shellId && probe.capabilities.resume === 'native') {
+        shellSession = new ShellSession(store, shellId);
+        if (!resumeMeta && !options.newSession) {
+          resumeMeta = await shellSession.current(cwd, backend.id);
+          resumeRef = resumeMeta?.nativeRef;
+        }
+      }
       const meta = resumeMeta ?? await store.create({ prompt, cwd, backend: backend.id, model: config.backends[backend.id]?.model, config });
-      if (options.resumeRef) for (const event of (await store.read(meta.sessionId)).events) if (event.requestId) staleRequests.add(event.requestId);
-      writer = await store.begin(meta, { prompt, config, runId, resume: !!resumeMeta });
+      if (resumeRef) for (const event of (await store.read(meta.sessionId)).events) if (event.requestId) staleRequests.add(event.requestId);
+      writer = await store.begin({ ...meta, cwd, model: config.backends[backend.id]?.model }, { prompt, config, runId, resume: !!resumeMeta });
       await writer.context({ prompt, initialContext, backend: backend.id, cwd });
       if (initialContext) await persist('context.imported', { text: initialContext });
     } else {
@@ -83,10 +95,10 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
     }
     ui = await uiFactory({ prompt, cwd, input, output, onCancel: onSignal, signal: controller.signal,
       backendName: backend.id, uiConfig: config.ui, approvalConfig: config.approval });
-    ui.status(`正在连接 ${backend.id}`);
+    ui.status(`${resumeRef ? '正在继续会话' : '正在连接'} ${backend.id}`);
     // Cancellation also covers a backend stuck during connect/initialize.
     const connecting = backend.connect({ cwd, targetId, model: config.backends[backend.id]?.model, initialContext,
-      ephemeral, resumeRef: options.resumeRef, signal: controller.signal });
+      ephemeral, resumeRef, resumeHome: resumeRef ? resumeMeta?.nativeHome : undefined, signal: controller.signal });
     const abortConnect = new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(fatal), { once: true }));
     try { session = await Promise.race([connecting, abortConnect]); }
     catch (e) { connecting.then((late) => late.close()).catch(() => {}); throw e; }
@@ -94,6 +106,7 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
     if (writer) {
       Object.assign(writer.meta, { nativeRef: session.nativeRef, nativeHome: session.nativeHome, nativeManaged: false, resume: probe.capabilities.resume ?? 'none' });
       await writer.update();
+      if (session.nativeRef) await shellSession?.bind(writer.meta);
     }
     await state('thinking');
     const stream = session.run({ runId, prompt: `${config.context.text ? `Project context (untrusted data):\n${config.context.text}\n` : ''}${prompt}\nRespond in locale: ${config.ui.language}`, signal: controller.signal });
@@ -209,7 +222,7 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
     closing = true; budget.pause();
     // Abort outstanding tool requests before tearing down the terminal.
     controller.abort();
-    await session?.close().catch((e) => { caught ??= e; });
+    await session?.close().catch((e) => { caught ??= e; if (status === 'completed') status = 'failed'; });
     process.removeListener('SIGINT', onSignal); process.removeListener('SIGTERM', onSignal); signal?.removeEventListener('abort', onSignal);
     try { await writer?.finish(status, caught ? { error: caught.code ?? 'run_failed', message: safeText(caught.message) } : {}); }
     catch (e) { caught = new AgentError('storage_error', `历史最终状态保存失败：${e.message}`); }

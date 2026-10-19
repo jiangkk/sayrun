@@ -7,7 +7,12 @@
     "type": "git",
     "url": "git+https://github.com/jiangkk/sayrun.git"
   },
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "homepage": "https://github.com/jiangkk/sayrun#readme",
+  "bugs": {
+    "url": "https://github.com/jiangkk/sayrun/issues"
+  },
+  "keywords": ["terminal", "zsh", "ai", "agent", "dsh", "cli"],
   "files": [
     "dist/",
     "docs/images/approval-preview.png"
@@ -25,6 +30,8 @@
     "test:pty": "python3 test/terminal-pty.py && python3 test/history-pty.py && python3 test/commands-pty.py",
     "doctor": "node dist/sayrun.js doctor",
     "test:package": "python3 test/package-install.py",
+    "test:dsh": "node --import tsx test/dsh-native-smoke.mjs",
+    "export:public": "node scripts/export-public.mjs",
     "build": "npm run typecheck && bun scripts/build.ts",
     "prepack": "npm run build",
     "prepublishOnly": "npm run build",

@@ -14,5 +14,16 @@ docs/
 .runtime/
 .dist-*/
 .env
+.env.*
+.credentials*
+.dsh/
+id_rsa
+id_ed25519
+*.pem
+*.key
+*.p12
+*.pfx
 *.log
 *.tgz
+.github/
+website/
