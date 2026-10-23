@@ -13,6 +13,7 @@ import { visibleContext } from '../src/history/context.ts';
 import { exportMarkdown } from '../src/history/export.ts';
 import { editShellBlock, shellBlock, shellPlan, applyShellPlan, editorArgv } from '../src/platform/shell-setup.ts';
 import { runAgent } from '../src/application/run-task.ts';
+import { runCommand } from '../src/execution/process-runner.ts';
 import { backendEvent, admitBackend } from '../src/backends/protocol.ts';
 import { DshBackend, dshCapabilities } from '../src/backends/dsh/backend.ts';
 import { convertDsh, migrate } from '../src/history/migrate-dsh.ts';
@@ -174,19 +175,168 @@ test('persistence errors prevent execution, and result-write failure stops befor
   const store2 = new SessionStore({ env: s.env }), begin2 = store2.begin.bind(store2);
   store2.begin = async (...args) => { const w = await begin2(...args); w.result = async () => { throw new Error('disk full after execute'); }; return w; };
   const second = fixture([{ ...command, cwd: s.cwd }, { ...command, requestId: 'two', cwd: s.cwd }]);
-  await assert.rejects(coordinate(s, second.backend, { store: store2, execute: async () => { executions++; return success; } }), /命令已执行/);
+  const stop = new AbortController();
+  await assert.rejects(coordinate(s, second.backend, { store: store2, signal: stop.signal, execute: async () => { executions++; stop.abort(); return success; } }), /命令已执行/);
   assert.equal(executions, 1); assert.equal(second.info.replies.length, 0);
 });
 
 test('Coordinator budgets and cancellation have distinct outcomes; history-disabled does not create task contents', async (t) => {
   const s = await sandbox(t), peer = fixture([{ ...command, cwd: s.cwd }, { ...command, requestId: 'two', cwd: s.cwd }]);
-  await assert.rejects(coordinate(s, peer.backend, { maxCommands: 1 }), (e) => e.exitCode === 4);
+  assert.equal((await coordinate(s, peer.backend, { maxCommands: 1 })).exitCode, 4);
   const cancel = new AbortController();
   await assert.rejects(coordinate(s, fixture([{ ...command, cwd: s.cwd }]).backend, { signal: cancel.signal, uiFactory: ui({ approve: () => { cancel.abort(); return command; } }) }), (e) => e.exitCode === 130);
   const conf = config(); conf.history.enabled = false;
   const done = fixture([{ type: 'run.ended', reason: 'completed' }]); const result = await coordinate(s, done.backend, { config: conf });
   assert.equal(result.sessionId, undefined);
   await assert.rejects(coordinate(s, fixture([]).backend, { ephemeral: true }), /ephemeral/);
+});
+
+test('budget stops produce a persisted summary instead of a bare limit error', async (t) => {
+  const s = await sandbox(t);
+  for (const [events, options, key] of [
+    [[{ ...command, cwd: s.cwd }, { ...command, requestId: 'two', cwd: s.cwd }], { maxCommands: 1 }, 'agent.max_commands'],
+    [[{ type: 'status', phase: 'thinking' }, { type: 'status', phase: 'checking' }], { maxSteps: 1 }, 'agent.max_steps'],
+    [[{ type: 'question.requested', requestId: 'a', question: '范围？' }, { type: 'question.requested', requestId: 'b', question: '目标？' }], { maxQuestions: 1 }, 'agent.max_questions'],
+  ]) {
+    let text = '';
+    const store = new SessionStore({ env: s.env });
+    const result = await coordinate(s, fixture(events).backend, { ...options, store, output: { isTTY: true, write(s) { text += s; } } });
+    assert.equal(result.exitCode, 4); assert.equal(result.status, 'limited');
+    assert.match(text, /已做的事/); assert.match(text, /当前卡点/); assert.match(text, /下一步/);
+    assert.doesNotMatch(text, /达到.*上限|任务已完成/);
+    const data = await store.read(result.sessionId);
+    assert.ok(data.events.some((e) => e.type === 'run.limited' && e.reason === key.replace('agent.', '')));
+    assert.ok(data.events.some((e) => e.type === 'message' && e.final && e.text.includes('当前卡点')));
+  }
+});
+
+test('default budget permits fifteen approved attempts and then accepts a text-only wrap-up', async (t) => {
+  const s = await sandbox(t), events = [], modelSummary = '**已检查**：15 次检查均未定位问题。\n\n**卡点**：服务持续返回 503，缺少服务端日志。\n\n**下一步**：提供对应时段的服务端日志。';
+  assert.equal(defaults.agent.max_steps, 15); assert.ok(defaults.agent.max_commands >= 15);
+  for (let i = 0; i < 16; i++) events.push({ type: 'status', phase: 'thinking' }, { ...command, cwd: s.cwd, requestId: `attempt-${i}` });
+  events.push({ type: 'status', phase: 'checking' }, { type: 'message', text: modelSummary, final: true });
+  const peer = fixture(events); let executions = 0, approvals = 0, text = '';
+  const result = await coordinate(s, peer.backend, {
+    uiFactory: ui({ approve: (p) => { approvals++; return p; } }),
+    execute: async () => { executions++; return { ...success, exitCode: 7, output: '503 Service Unavailable' }; },
+    output: { isTTY: true, write(s) { text += s; } },
+  });
+  assert.equal(result.exitCode, 4); assert.equal(executions, 15); assert.equal(approvals, 15);
+  assert.equal(peer.info.replies.at(-1).code, 'task_budget');
+  assert.match(peer.info.replies.at(-1).message, /NOT executed|NOT executed or answered/);
+  assert.match(text, /缺少服务端日志/); assert.doesNotMatch(text, /达到.*上限/);
+});
+
+test('requests declined during wrap-up cannot be replayed after native resume', async (t) => {
+  const s = await sandbox(t), store = new SessionStore({ env: s.env });
+  const stopped = await coordinate(s, fixture([{ ...command, cwd: s.cwd }, { ...command, cwd: s.cwd, requestId: 'declined' }]).backend, { store, maxCommands: 1 });
+  const meta = await store.resolve(stopped.sessionId); let executions = 0;
+  const data = await store.read(meta.sessionId);
+  assert.ok(data.events.some((e) => e.type === 'tool.declined' && e.requestId === 'declined'));
+  await assert.rejects(coordinate(s, fixture([{ ...command, cwd: s.cwd, requestId: 'declined' }]).backend, {
+    store, resumeMeta: meta, resumeRef: meta.nativeRef, execute: async () => { executions++; return success; },
+  }), /重放旧/);
+  assert.equal(executions, 0);
+});
+
+test('wrap-up cannot execute extra commands and has a finite step budget', async (t) => {
+  const s = await sandbox(t), events = [{ ...command, cwd: s.cwd }];
+  for (let i = 0; i < 5; i++) events.push({ type: 'status', phase: 'thinking' }, { ...command, cwd: s.cwd, requestId: `extra-${i}` });
+  const peer = fixture(events); let executions = 0, text = '';
+  const result = await coordinate(s, peer.backend, { maxCommands: 1,
+    execute: async () => { executions++; return { ...success, exitCode: 7, output: 'Permission denied: /example/log' }; },
+    output: { isTTY: true, write(s) { text += s; } },
+  });
+  assert.equal(result.exitCode, 4); assert.equal(executions, 1);
+  assert.equal(peer.info.replies.filter((r) => r.code === 'task_budget').length, 3);
+  assert.match(text, /Permission denied/); assert.match(text, /当前卡点/); assert.match(text, /下一步/);
+});
+
+test('wrap-up deadline or backend loss falls back to execution facts without retrying side effects', async (t) => {
+  const s = await sandbox(t), { EventQueue } = await import('../src/backends/protocol.ts');
+  for (const disconnect of [false, true]) {
+    const events = new EventQueue(); let executions = 0, text = '';
+    const backend = { id: 'fixture', apiVersion: 1, probe: async () => ({ available: true, capabilities: dshCapabilities, diagnostics: [] }),
+      connect: async () => {
+        let runId;
+        return { run(input) { runId = input.runId; events.push(backendEvent(runId, { ...command, cwd: s.cwd })); return events; },
+          reply: async (reply) => {
+            if (reply.kind === 'command') events.push(backendEvent(runId, { ...command, cwd: s.cwd, requestId: 'blocked' }));
+            else if (disconnect) events.end(new Error('backend disconnected during wrap-up'));
+          },
+          close: async () => events.end(), interrupt: async () => {} };
+      } };
+    const result = await coordinate(s, backend, { maxCommands: 1, summaryTimeoutMs: 20,
+      execute: async () => { executions++; return { ...success, exitCode: 7, output: 'service unavailable' }; },
+      output: { isTTY: true, write(s) { text += s; } },
+    });
+    assert.equal(result.exitCode, 4); assert.equal(executions, 1);
+    assert.match(text, /service unavailable/); assert.match(text, /后端未能完成收尾说明/);
+  }
+});
+
+test('active timeout saves the interrupted command result and ends with a factual summary', async (t) => {
+  const s = await sandbox(t), peer = fixture([{ ...command, cwd: s.cwd }]); let text = '';
+  const result = await coordinate(s, peer.backend, { taskTimeoutMs: 300,
+    execute: async (proposal, { signal }) => new Promise((resolve) => signal.addEventListener('abort', () => resolve({ ...success, cancelled: true, exitCode: null, output: 'waiting for server response' }), { once: true })),
+    output: { isTTY: true, write(s) { text += s; } },
+  });
+  assert.equal(result.exitCode, 4); assert.equal(peer.info.replies.length, 0);
+  assert.match(text, /waiting for server response/); assert.match(text, /执行已中断/); assert.match(text, /当前卡点/);
+  const data = await new SessionStore({ env: s.env }).read(result.sessionId);
+  assert.ok(data.events.some((e) => e.type === 'execution.result' && e.cancelled));
+});
+
+test('output display errors cancel execution, persist its actual result and restore the UI', async (t) => {
+  const s = await sandbox(t), peer = fixture([{ ...command, command: "printf 'actual output'; sleep 30", cwd: s.cwd }]); let closed = false;
+  const store = new SessionStore({ env: s.env });
+  await assert.rejects(coordinate(s, peer.backend, { store,
+    uiFactory: async () => ({ ...await ui()(), output() { throw new Error('display failed'); }, close: async () => { closed = true; } }),
+    execute: runCommand,
+  }), /界面.*display failed/);
+  assert.equal(closed, true); assert.equal(peer.info.replies.length, 0);
+  const [meta] = await store.list({ all: true }), data = await store.read(meta.sessionId);
+  assert.equal(meta.status, 'failed');
+  assert.ok(data.events.some((e) => e.type === 'execution.result' && e.cancelled));
+  assert.ok(Object.values(data.outputs).includes('actual output'));
+});
+
+test('budgets reset for each new prompt in the same native conversation', async (t) => {
+  const s = await sandbox(t), runs = [];
+  for (let i = 0; i < 3; i++) runs.push(await coordinate(s, fixture([
+    { type: 'status', phase: 'thinking' }, { type: 'question.requested', requestId: `question-${i}`, question: '范围？' },
+    { ...command, cwd: s.cwd, requestId: `command-${i}` }, { type: 'status', phase: 'checking' },
+  ]).backend, { shellId: 'budget-shell', maxCommands: 1, maxSteps: 2, maxQuestions: 1 }));
+  assert.equal(new Set(runs.map((r) => r.sessionId)).size, 1);
+  assert.ok(runs.every((r) => r.exitCode === 0));
+  assert.equal((await new SessionStore({ env: s.env }).resolve(runs[0].sessionId)).commands, 3);
+});
+
+test('malformed DSH messages after execution stop cleanly and retain the saved result', async (t) => {
+  const s = await sandbox(t), before = { ...process.env };
+  const keys = ['TA_HOME', 'TERMINAL_AGENT_HOME', 'TERMINAL_AGENT_FIXTURE_SCENARIO'];
+  Object.assign(process.env, { TA_HOME: s.env.TA_HOME, TERMINAL_AGENT_HOME: join(s.dir, 'native'), TERMINAL_AGENT_FIXTURE_SCENARIO: 'malformed-after-execution' });
+  let executions = 0, closed = false;
+  try {
+    const store = new SessionStore({ env: s.env });
+    const backend = new DshBackend({ binary: new URL('./fixture-dsh.mjs', import.meta.url).pathname, credentials: join(s.dir, 'missing') });
+    await assert.rejects(coordinate(s, backend, { store, taskTimeoutMs: 3000,
+      uiFactory: async () => ({ ...await ui()(), close: async () => { closed = true; } }),
+      execute: async () => { executions++; return { ...success, exitCode: 7, output: 'FIRST_STEP' }; },
+    }), /DSH 消息处理失败/);
+    assert.equal(executions, 1); assert.equal(closed, true);
+    const [meta] = await store.list({ all: true }), data = await store.read(meta.sessionId);
+    assert.equal(meta.status, 'failed');
+    assert.equal(data.events.filter((e) => e.type === 'execution.result').length, 1);
+    assert.ok(Object.values(data.outputs).includes('FIRST_STEP'));
+  } finally { for (const key of keys) { if (before[key] === undefined) delete process.env[key]; else process.env[key] = before[key]; } }
+});
+
+test('UI cleanup failure preserves the original task error', async (t) => {
+  const s = await sandbox(t);
+  await assert.rejects(coordinate(s, fixture([{ ...command, targetId: 'remote' }]).backend, {
+    uiFactory: async () => ({ ...await ui()(), close: async () => { throw new Error('cleanup failed'); } }),
+  }), /不能切换执行目标/);
 });
 
 test('migration validates DSH v4, converts execution facts, preserves originals and deduplicates repeats', async (t) => {

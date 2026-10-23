@@ -48,6 +48,8 @@ host 请求格式：`{"id":1,"method":"hello","params":{"apiVersion":1}}`。
 
 问题使用 `question.requested` + requestId / question，答案返回 `kind:answer` / text / `commandApproval:false`。问题答案永远不能作为命令批准。
 
+任务预算用完时，host 进入只输出总结的收尾阶段。后续工具请求收到 `kind:error` / `code:task_budget`，表示该请求未执行、也未获得用户回答；后端应停止工具调用，仅根据已有观察总结已做的事、未解决的问题、具体卡点及证据、下一步或缺少的信息。host 最多容许两个额外模型步骤和 15 秒收尾时间，期间不再审批或执行命令。收尾失败时由 host 基于实际执行记录生成汇总，运行保持 `limited`、退出码 4。原有回复联合类型不变；适配器应把 error 回复交给模型，不能解释成命令成功或用户授权。
+
 命令响应 `kind:command`：拒绝时 approved:false / reason；批准时返回 approved:true、executionId、实际 command、cwd、targetId、output、exitCode、signal、timedOut、cancelled、truncated。后端必须使用编辑后的实际执行值，不能继续声称原提案已执行。
 
 其他事件为 status (`thinking` / `checking`)、message (text / final)、usage（未知字段省略）、run.ended (`completed` / `cancelled` / `limit` / `failed`)。message 只包含可见说明和结论，不包含隐藏推理。发生每个模型步骤时发送一次 status，以参与预算。

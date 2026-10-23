@@ -14,8 +14,13 @@ faulthandler.dump_traceback_later(60, exit=True)
 def run_case(mode, ui_mode):
     with tempfile.TemporaryDirectory(prefix="ta-pty-") as runtime:
         env = dict(os.environ, TERM="xterm-256color", TA_HOME=os.path.join(runtime, "product"), TERMINAL_AGENT_HOME=runtime, TERMINAL_AGENT_UI=ui_mode,
-                   TERMINAL_AGENT_FIXTURE_SCENARIO="question" if mode in ("question", "question-cancel") else "max-tokens" if mode == "max-tokens" else "",
+                   TERMINAL_AGENT_FIXTURE_SCENARIO={"question": "question", "question-cancel": "question", "max-tokens": "max-tokens", "backend-error": "malformed-after-execution", "budget-summary": "budget-summary"}.get(mode, ""),
                    TERMINAL_AGENT_DSH_BIN=os.path.join(root, "test", "fixture-dsh.mjs"))
+        if mode == "budget-summary":
+            config_dir = os.path.join(env["TA_HOME"], "config")
+            os.makedirs(config_dir)
+            with open(os.path.join(config_dir, "config.toml"), "w") as config:
+                config.write('[agent]\nmax_steps=1\n')
         if mode == "setup":
             env["ZDOTDIR"] = runtime
             os.mkdir(os.path.join(runtime, "bin"))
@@ -166,13 +171,28 @@ def run_case(mode, ui_mode):
                 assert b"INTERNAL_PLAN_SHOULD_NOT_APPEAR" not in transcript
                 assert b"**FIXTURE_COMPLETED" not in transcript
                 assert "任务结论".encode() in transcript
-                if mode == "max-tokens": until("以上回答可能不完整")
+                if mode == "max-tokens": until("当前卡点")
                 if ui_mode == "tui":
                     # Final conclusion must be printed AFTER OpenTUI restores
                     # mouse/input modes, not inside a persistent footer.
                     assert transcript.rfind(b'\x1b[?1000l') < transcript.rfind(b'FIXTURE_COMPLETED_WITH_VERIFICATION')
                     assert b'\x1b[?1000l' in transcript
                 assert "继续对话".encode() not in transcript
+            elif mode == "budget-summary":
+                send("y\n" if ui_mode == "plain" else "y")
+                until("当前卡点")
+                until("需要服务端日志")
+                until("SUMMARY_END")
+                assert "达到本轮".encode() not in transcript
+                assert "任务尚未完成确认".encode() in transcript
+                assert "02  $".encode() not in transcript
+                if ui_mode == "tui":
+                    assert transcript.rfind(b'\x1b[?1000l') < transcript.rfind(b'SUMMARY_END')
+            elif mode == "backend-error":
+                send("y\n" if ui_mode == "plain" else "y")
+                until("DSH 消息处理失败")
+                assert b"VERIFIED_RESULT" not in transcript
+                assert b"Uncaught" not in transcript
             elif mode == "deny":
                 send("n\n" if ui_mode == "plain" else "n")
                 until("已拒绝，命令未执行")
@@ -224,7 +244,7 @@ print("PASS: first setup activates zsh, cancellation preserves state, repeat set
 run_case("conversation", "plain")
 print("PASS: zsh followups preserve native history across ordinary commands and integration reloads", flush=True)
 for ui_mode in ("plain", "tui"):
-    for case in ("approve", "default-approve", "deny", "cancel", "question", "question-cancel", "classify", "max-tokens"):
+    for case in ("approve", "default-approve", "deny", "cancel", "question", "question-cancel", "classify", "max-tokens", "backend-error", "budget-summary"):
         run_case(case, ui_mode)
         print("PASS:", ui_mode, case, flush=True)
 run_case("edit", "tui")

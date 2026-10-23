@@ -395,8 +395,10 @@ export class OpenTuiUi implements TerminalUi {
     this.renderer.keyInput.off('keypress', this.keyListener);
     this.renderer.off('resize', this.resizeListener);
     this.renderer.off('render:error', this.errorListener);
-    await this.renderer.idle();
-    this.renderer.destroy();
-    await this.renderer.closed;
+    try { await this.renderer.idle(); }
+    finally {
+      this.renderer.destroy();
+      await this.renderer.closed;
+    }
   }
 }

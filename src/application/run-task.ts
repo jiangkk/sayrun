@@ -11,6 +11,8 @@ import { randomUUID } from 'node:crypto';
 import { createExecutor } from '../execution/local-zsh.ts';
 import { createTerminalUi } from '../terminal/factory.ts';
 import { ActiveBudget } from './active-budget.ts';
+import { taskSummary } from './task-summary.ts';
+import type { ExecutionFact } from './task-summary.ts';
 import { formatConclusion } from '../terminal/transcript.ts';
 import { loadConfig } from '../config/load.ts';
 import { createBackend } from '../backends/registry.ts';
@@ -28,7 +30,7 @@ export interface RunAgentOptions {
   ephemeral?: boolean; resumeMeta?: SessionMeta; initialContext?: string; cwd?: string; config?: Config;
   executor?: Executor; execute?: Executor['execute']; maxCommands?: number; maxSteps?: number;
   maxQuestions?: number; taskTimeoutMs?: number; signal?: AbortSignal; resumeRef?: string; store?: SessionStore;
-  newSession?: boolean; shellId?: string;
+  newSession?: boolean; shellId?: string; summaryTimeoutMs?: number;
 }
 export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
   const { input = process.stdin, output = process.stdout, backend: suppliedBackend,
@@ -47,13 +49,16 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
   let volatile: string | undefined, store: SessionStore | undefined, fatal: Error | undefined;
   let shellSession: ShellSession | undefined;
   let closing = false, denied = false, limited = false;
+  let summarizing = false, summarySteps = 0, summaryText = '', blocked: string | undefined;
+  let limitReason = '', summaryInterrupted = false, summaryTimer: ReturnType<typeof setTimeout> | undefined;
+  const facts: ExecutionFact[] = [];
   let commandCount = 0, stepCount = 0, questionCount = 0, conclusion = '', ended = false;
   let status: RunStatus = 'starting';
   const cancel = (error: Error = new AgentError('cancelled', '任务已取消', 130)) => {
     if (controller.signal.aborted) return;
     fatal = error; controller.abort();
   };
-  const budget = new ActiveBudget(limits.timeout, () => { limited = true; cancel(new AgentError('model_timeout', '达到本轮运行时间上限', 4)); });
+  const budget = new ActiveBudget(limits.timeout, () => { limited = true; limitReason = 'active_timeout_seconds'; cancel(new AgentError('model_timeout', '本次处理未能及时完成，正在整理已有结果', 4)); });
   const onSignal = () => cancel();
   process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
   const signal = options.signal;
@@ -65,9 +70,26 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
   };
   const state = async (value: RunStatus) => { status = value; await writer?.state(value); };
   const humanInput = async <T>(fn: () => Promise<T>): Promise<T> => { budget.pause(); try { return await fn(); } finally { if (!controller.signal.aborted) budget.resume(); } };
-  const limit = (message: string) => { limited = true; throw new AgentError('limit', message, 4); };
+  const summarize = (reason: string, pending?: string) => {
+    blocked ??= pending;
+    if (summarizing) return;
+    limited = true; summarizing = true; limitReason = reason; budget.pause();
+    ui?.status('正在汇总进展与卡点');
+    // Allow at most two text-only steps: one may already be in flight when the
+    // budget is reached, and the next can respond to our tool error directive.
+    summaryTimer = setTimeout(() => cancel(new AgentError('limit', '收尾说明未能及时完成', 4)), options.summaryTimeoutMs ?? 15000);
+  };
+  const summaryReply = (requestId: string): HostReply => ({ requestId, kind: 'error', code: 'task_budget',
+    message: 'Stop further actions. This request was NOT executed or answered. Based only on existing observations, give a final summary in the user\'s language: what was done and verified, what remains unresolved, the concrete blocker and evidence, and the next step or missing information. Do not claim success without verification. Do not call any more tools or ask further questions.' });
   const results = new Map<string, HostReply>(), signatures = new Map<string, string>(), eventIds = new Set<string>(), staleRequests = new Set<string>();
   let outcome: { exitCode: number; status: RunStatus; sessionId?: string; runId: string } | undefined, caught;
+  const finishLimited = async () => {
+    conclusion = taskSummary({ facts, blocked, modelText: summaryText || (limitReason === 'backend_output' ? conclusion : ''), interrupted: summaryInterrupted });
+    await persist('run.limited', { reason: limitReason, summaryInterrupted });
+    await persist('message', { text: conclusion, final: true });
+    status = 'limited';
+    outcome = { exitCode: 4, status, sessionId: writer?.meta.sessionId, runId };
+  };
   try {
     budget.resume();
     if (signal?.aborted) onSignal();
@@ -138,12 +160,16 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
       if (eventIds.has(event.id)) continue; eventIds.add(event.id);
       if (eventIds.size > 10000) throw new AgentError('protocol_error', '后端事件数量异常');
       if (event.type === 'status') {
-        if (++stepCount > limits.steps) limit('达到本轮模型轮数上限');
+        if (++stepCount > limits.steps) summarize('max_steps');
+        if (summarizing) {
+          if (++summarySteps > 2) { summaryInterrupted = true; break; }
+          continue;
+        }
         await state('thinking'); ui.status(stepCount === 1 ? '正在理解需求' : '正在检查结果'); continue;
       }
       if (event.type === 'message') {
         if (typeof event.text !== 'string' || event.text.length > 1024 * 1024 || typeof event.final !== 'boolean') throw new AgentError('protocol_error', '后端消息格式无效');
-        if (event.final) conclusion = safeText(event.text);
+        if (event.final) { conclusion = safeText(event.text); if (summarizing) summaryText = conclusion; }
         await persist('message', { text: safeText(event.text), final: event.final }); continue;
       }
       if (event.type === 'usage') {
@@ -152,7 +178,7 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
       }
       if (event.type === 'run.ended') {
         ended = true;
-        if (event.reason === 'limit') limited = true;
+        if (event.reason === 'limit') { limited = true; limitReason ||= 'backend_output'; summaryInterrupted = true; }
         else if (event.reason === 'cancelled') throw new AgentError('cancelled', '后端取消任务', 130);
         else if (event.reason !== 'completed') throw new AgentError('backend_failed', event.message ?? '后端运行失败');
         break;
@@ -170,18 +196,28 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
         await session.reply(results.get(requestId)!); continue;
       }
       signatures.set(requestId, signature);
+      if (event.type === 'command.requested' && event.targetId !== targetId) throw new AgentError('protocol_error', `后端不能切换执行目标：${event.targetId}`);
+      if (event.type === 'command.requested' && (typeof event.command !== 'string' || !event.command.trim() || event.command.length > 32768)) throw new AgentError('protocol_error', '命令为空或过长');
+      if (event.type === 'question.requested' && (typeof event.question !== 'string' || !event.question.trim() || event.question.length > 4096 || /[\x00-\x08\x0b-\x1f\x7f]/.test(event.question))) throw new AgentError('protocol_error', '无效的问题');
+      if (event.type === 'command.requested' && commandCount >= limits.commands) summarize('max_commands', event.command);
+      if (event.type === 'question.requested' && questionCount >= limits.questions) summarize('max_questions', event.question);
+      if (summarizing) {
+        blocked ??= event.type === 'command.requested' ? event.command : event.question;
+        summaryText = '';
+        await persist('tool.declined', { requestId, reason: 'task_budget', requestType: event.type });
+        const reply = summaryReply(requestId); results.set(requestId, reply);
+        await session.reply(reply); continue;
+      }
       let reply: HostReply;
       if (event.type === 'question.requested') {
-        if (typeof event.question !== 'string' || !event.question.trim() || event.question.length > 4096 || /[\x00-\x08\x0b-\x1f\x7f]/.test(event.question)) throw new AgentError('protocol_error', '无效的问题');
-        if (++questionCount > limits.questions) limit('达到本轮追问次数上限');
+        questionCount++;
         await persist('question.requested', { requestId, question: event.question }); await state('awaiting_input');
         const text = await humanInput(() => ui!.requestInput({ question: event.question })); assertActive();
         if (typeof text !== 'string' || !text.trim() || text.length > 8192 || /[\x00-\x08\x0b-\x1f\x7f]/.test(text)) throw new AgentError('protocol_error', '无效的用户回答');
         reply = { requestId, kind: 'answer', text, commandApproval: false };
         await persist('question.answered', { ...reply, question: event.question });
       } else {
-        if (event.targetId !== targetId) throw new AgentError('protocol_error', `后端不能切换执行目标：${event.targetId}`);
-        if (++commandCount > limits.commands) limit('达到本轮命令次数上限');
+        commandCount++;
         const proposal = await executor.normalize(event, cwd);
         await persist('command.requested', { requestId, proposedCommand: proposal.command, cwd: proposal.cwd, targetId });
         await state('awaiting_approval');
@@ -201,10 +237,18 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
         if (volatile) await writeJson(join(volatile, 'state.json'), { runId, executionId, status: 'executing' });
         assertActive();
         const result = await execute(exact, { signal: controller.signal, shell: config.execution.shell, timeoutMs: config.execution.timeout_seconds * 1000,
-          maxBytes: config.execution.max_output_bytes, onOutput: (text) => ui!.output(safeText(text)) });
+          maxBytes: config.execution.max_output_bytes, onOutput: (text) => {
+            if (controller.signal.aborted) return;
+            try { ui!.output(safeText(text)); }
+            // Output arrives on a child-process stream callback. Cancel through
+            // the coordinator so execution settles and its result is saved.
+            catch (e) { cancel(new AgentError('ui_error', `命令输出界面失败，已停止后续动作：${e.message}`)); }
+          } });
         // Persist and fsync the result before acknowledging it to the backend.
         try { await writer?.result(executionId, result, config.history.store_command_output); }
         catch (e) { throw new AgentError('storage_error', `命令已执行，但结果保存失败；停止后续动作：${e.message}`); }
+        facts.push({ command: exact.command, description: exact.description, result });
+        assertActive();
         ui.result({ ...result, maxOutputBytes: config.execution.max_output_bytes });
         reply = { requestId, kind: 'command', approved: true, executionId, command: exact.command, cwd: exact.cwd, targetId, ...result };
         assertActive();
@@ -212,25 +256,33 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
       results.set(requestId, reply); await session.reply(reply); await state('thinking');
     }
     assertActive();
-    if (!ended && !denied) throw new AgentError('protocol_error', '后端未发送 run.ended 就关闭事件流');
+    if (!ended && !denied && !summarizing) throw new AgentError('protocol_error', '后端未发送 run.ended 就关闭事件流');
     status = denied ? 'stopped' : limited ? 'limited' : 'completed';
     outcome = { exitCode: denied ? 3 : limited ? 4 : 0, status, sessionId: writer?.meta.sessionId, runId };
+    if (limited) await finishLimited();
   } catch (e) {
-    caught = fatal ?? e;
+    caught = e.code === 'storage_error' ? e : fatal ?? e;
     status = caught.exitCode === 130 ? 'cancelled' : caught.exitCode === 4 ? 'limited' : 'failed';
+    if (caught.code !== 'storage_error' && caught.exitCode !== 130 && (summarizing || caught.exitCode === 4)) {
+      limited = true; summaryInterrupted = true;
+      try { await finishLimited(); caught = undefined; }
+      catch (e) { caught = e; status = 'failed'; }
+    }
   } finally {
-    closing = true; budget.pause();
+    closing = true; budget.pause(); clearTimeout(summaryTimer);
     // Abort outstanding tool requests before tearing down the terminal.
     controller.abort();
     await session?.close().catch((e) => { caught ??= e; if (status === 'completed') status = 'failed'; });
     process.removeListener('SIGINT', onSignal); process.removeListener('SIGTERM', onSignal); signal?.removeEventListener('abort', onSignal);
     try { await writer?.finish(status, caught ? { error: caught.code ?? 'run_failed', message: safeText(caught.message) } : {}); }
     catch (e) { caught = new AgentError('storage_error', `历史最终状态保存失败：${e.message}`); }
-    if (volatile) await rm(volatile, { recursive: true, force: true });
-    await ui?.close();
+    try { if (volatile) await rm(volatile, { recursive: true, force: true }); }
+    catch (e) { caught ??= e; }
+    try { await ui?.close(); }
+    catch (e) { caught ??= e; }
   }
   if (caught) throw caught;
-  if (!denied) output.write(formatConclusion(conclusion, { output, color: config.ui.color === 'always' ? true : config.ui.color === 'never' ? false : undefined, commands: commandCount, elapsed: Date.now() - started, incomplete: limited }));
+  if (!denied) output.write(formatConclusion(conclusion, { output, color: config.ui.color === 'always' ? true : config.ui.color === 'never' ? false : undefined, commands: facts.length, elapsed: Date.now() - started }));
   if (store && config.history.auto_gc) await store.gc({ retentionDays: config.history.retention_days, maxTotalMb: config.history.max_total_mb, apply: true });
   return outcome!;
 }

@@ -4,6 +4,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { normalizeCommand, runCommand } from '../src/execution/process-runner.ts';
 import { LineRpc } from '../src/backends/dsh/rpc.ts';
 import { prepareDsh, projectRoot } from '../src/backends/dsh/composition.ts';
@@ -55,6 +57,22 @@ test('JSON-RPC correlates concurrent requests and propagates process exit', asyn
     assert.equal(a.delay, 40); assert.equal(b.delay, 1);
     await assert.rejects(rpc.request('exit', {}), /DSH 已退出/);
   } finally { child.kill(); rpc.close(); }
+});
+
+test('malformed DSH notifications and handler errors fail the connection without escaping the stream callback', async () => {
+  for (const params of [null, [], { event: null }]) {
+    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stdin: new PassThrough() });
+    const failures = [];
+    const rpc = new LineRpc(child, (method, value) => { const { type } = value.event; void type; }, (e) => failures.push(e));
+    try {
+      const pending = rpc.request('pending', {});
+      const rejected = assert.rejects(pending, (e) => e.code === 'protocol_error');
+      assert.doesNotThrow(() => child.stdout.write(JSON.stringify({ method: 'session.event', params }) + '\n'));
+      await rejected;
+      assert.equal(failures.length, 1);
+      await assert.rejects(rpc.request('later', {}), (e) => e === failures[0]);
+    } finally { rpc.close(); child.stdout.destroy(); child.stdin.destroy(); }
+  }
 });
 
 test('DSH composition exposes only the approval-gated terminal tool', async () => {
