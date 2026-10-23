@@ -163,13 +163,16 @@ DSH 通过 `session/resume` 恢复原生历史，保留其上下文压缩结果�
 sayrun config show --effective       # 查看实际配置及来源
 sayrun config set ui.mode plain      # 所有命令使用纯文本界面
 sayrun config set ui.mode opentui    # 切回 OpenTUI
-sayrun config set agent.max_commands 10
+sayrun config set agent.max_commands 20
+sayrun config set agent.max_steps 24
 sayrun config set execution.timeout_seconds 60
 sayrun backend list
 sayrun backend check dsh
 ```
 
 用户配置默认位于 `~/.config/terminal-agent/config.toml`，项目配置使用 `.terminal-agent.toml`；这些路径沿用旧版命名，以兼容已有配置和历史。涉及后端、模型、预算等字段时，需要先执行 `sayrun config trust .`。
+
+默认每次任务最多 15 条命令、15 个模型步骤、5 次追问和 600 秒活动时间，等待人工输入时暂停计时；同一会话再次提问会重新计数。预算用完时先汇总进展、卡点和下一步；模型无法收尾时根据执行记录汇总。较长任务可调整预算。详见[执行与异常](docs/guide/usage.md#执行与异常)。
 
 ## 常见问题
 

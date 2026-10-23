@@ -1,6 +1,6 @@
 {
   "name": "sayrun-shell",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "description": "Sayrun: an AI terminal assistant for zsh. Use natural language, approve each command, and keep your shell workflow. Powered by your installed DeepSeek Harness (DSH).",
   "repository": {

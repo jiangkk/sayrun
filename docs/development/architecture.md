@@ -77,6 +77,7 @@ test/
 | `src/application/run-task.ts` | 后端连接、统一事件消费、审批 / 回答、执行、落盘、去重、预算和取消；支持注入依赖进行测试。 |
 | `src/application/classify-input.ts` | 按产品配置选择分类后端、记录分类历史，失败时返回 `ask`。 |
 | `src/application/active-budget.ts` | 计算模型 / 执行活跃时间，等待用户时暂停。 |
+| `src/application/task-summary.ts` | 预算停止且模型无法收尾时，根据实际执行事实汇总进展、卡点和下一步，不推断任务成功或故障根因。 |
 | `src/cli/main.ts` | 顶层命令解析、任务 / 恢复入口、Bun UI 重新启动、错误与退出码映射。 |
 | `src/cli/manage.ts` | 管理命令分派；处理安装、shell、认证入口、版本、更新、profile、迁移等简单分支。 |
 | `src/cli/commands/config.ts` | 查看 / 设置 / 编辑 / 校验配置及项目信任。 |

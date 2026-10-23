@@ -94,7 +94,7 @@ OpenTUI 的粘贴和换行不会触发执行。纯文本模式保留逐条审批
 ```zsh
 sayrun config show --effective --json
 sayrun config get execution.timeout_seconds
-sayrun config set agent.max_commands 10
+sayrun config set agent.max_commands 20
 sayrun config set ui.mode plain
 sayrun config edit
 sayrun config validate
@@ -113,10 +113,10 @@ schema_version = 1
 
 [agent]
 backend = "dsh"
-max_commands = 8
-max_steps = 12
+max_commands = 15
+max_steps = 15
 max_questions = 5
-active_timeout_seconds = 180
+active_timeout_seconds = 600
 
 [routing]
 mode = "auto"                 # auto | local（歧义人工选择）| explicit（只用 ask）
@@ -265,7 +265,20 @@ sayrun migrate --from /absolute/path/.runtime/dsh --apply
 
 重复 `requestId` 复用已记录结果，内容不同的重复 ID、过期请求、切换目标请求会被拒绝；多个请求按队列逐条审批。后端断线会撤回等待中的交互并停止任务。后端完成不能跳过尚未结束的 host 执行。
 
-默认最多 8 条命令、12 个模型步骤、5 次问题、180 秒活动时间，人工等待时暂停；每条命令独立限时 30 秒、输出最多 64 KiB。取消、超时和命令结束会清理普通进程组；自行脱离进程组的进程不在该保证内。命令环境过滤常见凭证变量；这是审批执行器，没有实现 OS 沙箱。
+默认每次任务最多 15 条命令、15 个模型步骤、5 次问题、600 秒活动时间，等待审批、编辑或回答时暂停活动时间。预算按单次请求（run）计算，同一会话的后续提问重新计数，不限制会话累计提问次数。命令、模型步骤或追问预算用完后，进入收尾阶段：不再执行命令或追问，要求模型总结已做的事、哪些结果得到验证、具体卡点及证据、下一步或缺少的信息。额外收尾最多两个模型步骤、15 秒；后端断开、不遵守收尾要求或超时时，根据已记录的执行事实生成汇总，不把退出码为 0 当作任务完成证明。活动时间用完时先中断正在运行的命令、保存可获得的实际结果，再由本地汇总；这些情况保留 limited 状态和退出码 4，不只显示轮次上限。
+
+需要较长任务时，可在终端调整用户配置后再次提问；以下示例会写入配置，不调用模型：
+
+```zsh
+sayrun config set agent.max_commands 20
+sayrun config set agent.max_steps 40
+sayrun config set agent.active_timeout_seconds 600
+sayrun config show --effective
+```
+
+已有用户配置中的显式旧值保持有效，不会自动改写；项目配置或 profile 也可能覆盖用户值，以 `show --effective` 为准。`resume` 还会保留历史配置快照中更严格的限制；要使用调高后的预算，可在已启用集成的同一 shell 中直接再次提问。模型输出上限是后端限制，与宿主命令次数、步骤预算分开。
+
+每条命令独立限时 30 秒、输出最多 64 KiB。取消、超时和命令结束会清理普通进程组；自行脱离进程组的进程不在该保证内。命令环境过滤常见凭证变量；这是审批执行器，没有实现 OS 沙箱。DSH 消息处理或命令输出展示失败时会停止任务并关闭界面；展示失败会取消正在运行的命令，先保存可获得的实际结果，不自动重试命令。
 
 退出码：`0` 完成，`1` 运行失败，`2` 参数/配置错误，`3` 拒绝，`4` 预算/模型输出上限，`5` 后端能力/认证不可用，`130` 取消。命令自己的失败状态独立记录，后续修复成功不一定意味着整个任务失败。
 

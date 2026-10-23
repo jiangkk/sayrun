@@ -15,6 +15,17 @@ async function setup(width = 90, height = 19) {
   return { ...s, ui, controller, transcript };
 }
 
+test('shutdown destroys the renderer even when waiting for idle fails', async () => {
+  const s = await setup();
+  const originalIdle = s.renderer.idle.bind(s.renderer);
+  s.renderer.idle = async () => { throw new Error('render failed'); };
+  try {
+    await expect(s.ui.close()).rejects.toThrow('render failed');
+    await s.renderer.closed;
+    expect(s.renderer.isDestroyed).toBe(true);
+  } finally { s.renderer.idle = originalIdle; s.renderer.destroy(); }
+});
+
 test('Enter approves by default; switching selection can still reject', async () => {
   const s = await setup();
   try {

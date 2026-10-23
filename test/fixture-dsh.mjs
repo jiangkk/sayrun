@@ -61,8 +61,19 @@ rl.on('line', async (line) => {
       ] } });
       const first = await execute('printf FIRST_STEP; exit 7');
       if (first.exitCode !== 7) throw new Error('fixture expected exit 7');
+      if (process.env.TERMINAL_AGENT_FIXTURE_SCENARIO === 'malformed-after-execution') {
+        event(sessionId, 'assistant/message', { message: { content: {} } });
+        return;
+      }
       event(sessionId, 'step/start', {});
       const second = await execute('printf VERIFIED_RESULT');
+      if (process.env.TERMINAL_AGENT_FIXTURE_SCENARIO === 'budget-summary') {
+        if (second.code !== 'task_budget') throw new Error('summary request must not execute');
+        event(sessionId, 'step/start', {});
+        assistant(sessionId, '**已做的事**：执行了首个检查，退出码为 7。\n\n**当前卡点**：已有 FIRST_STEP 结果不足以确认问题，需要服务端日志。\n\n**下一步**：补充对应时段的服务端日志。\n\nSUMMARY_END');
+        event(sessionId, 'turn/end', { reason: { kind: 'completed' } });
+        return;
+      }
       if (second.exitCode !== 0 || second.output !== 'VERIFIED_RESULT') throw new Error('fixture verification failed');
       assistant(sessionId, `**FIXTURE_COMPLETED_WITH_VERIFICATION**\n\n### 验证结果\n- 已收到 \`VERIFIED_RESULT\`。\n- NATIVE_TURN_${state.turns}\n- FINAL_ANSWER_END`);
       event(sessionId, 'turn/end', { reason: { kind: process.env.TERMINAL_AGENT_FIXTURE_SCENARIO === 'max-tokens' ? 'max-tokens' : 'completed' } });

@@ -2,7 +2,7 @@ import type { Config } from '../contracts/config.ts';
 
 export const defaults: Config = {
   schema_version: 1,
-  agent: { backend: 'dsh', max_commands: 8, max_steps: 12, max_questions: 5, active_timeout_seconds: 180 },
+  agent: { backend: 'dsh', max_commands: 15, max_steps: 15, max_questions: 5, active_timeout_seconds: 600 },
   routing: { mode: 'auto', classifier: 'backend', confidence_threshold: 0.9, timeout_seconds: 12, on_ambiguous: 'ask' },
   ui: { mode: 'opentui', language: 'zh-CN', color: 'auto', output_preview_lines: 12 },
   approval: { default_selection: 'approve', editor_enter: 'execute' },
