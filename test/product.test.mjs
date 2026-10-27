@@ -533,6 +533,8 @@ test('installation identity is stable under concurrent store initialization', as
 
 test('setup CLI applies idempotently, uninstalls its block, and shell wrapper toggles the parent shell', async (t) => {
   const s = await sandbox(t), zshrc = join(s.dir, 'zshrc'); await writeFile(zshrc, '# original\n');
+  // setup runs doctor; use the offline peer even when the host has no DSH.
+  s.env.TERMINAL_AGENT_DSH_BIN = new URL('./fixture-dsh.mjs', import.meta.url).pathname;
   const before = await readFile(zshrc, 'utf8'); assert.equal(cli(s, 'setup', '--dry-run', '--zshrc', zshrc).status, 0); assert.equal(await readFile(zshrc, 'utf8'), before);
   const first = cli(s, 'setup', '--yes', '--zshrc', zshrc); assert.equal(first.status, 0, first.stdout);
   assert.match(first.stdout, /当前终端立即启用：eval/);
