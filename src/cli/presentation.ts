@@ -40,7 +40,7 @@ const labels: Record<string, string> = {
   parentSessionId: '来源会话', context: '上下文', included: '已包含', total: '总计', bytes: '字节',
   candidates: '候选项', imported: '已导入', indexed: '已索引', deleted: '已删除', skipped: '已跳过', duplicate: '重复',
   schemaVersion: '数据格式', schema_version: '配置格式', agent: '任务', execution: '执行', ui: '界面', history: '历史', routing: '输入路由',
-  profiles: '配置预设', backends: '后端设置', approval: '命令审批', disabled: '已禁用', binary: '可执行程序',
+  profiles: '配置预设', backends: '后端设置', approval: '命令授权', disabled: '已禁用', binary: '可执行程序',
   hostTools: '宿主工具', commandEditing: '命令编辑', userQuestions: '追问', cancellation: '取消方式', ephemeral: '临时会话', classify: '意图识别', modelDiscovery: '模型发现', usage: '用量统计',
   change: '计划更改', storage: '存储位置', shell: 'Shell 集成', max_commands: '命令上限', max_steps: '步骤上限',
 };

@@ -14,6 +14,8 @@ export interface TerminalUi {
   message(text: string): void;
   requestInput(request: { question: string }): Promise<string>;
   approve(proposal: CommandProposal, count: number, max: number): Promise<CommandProposal | null>;
+  command(proposal: CommandProposal, count: number, max: number): void;
+  external<T>(action: () => Promise<T>): Promise<T>;
   output(text: string): void;
   result(result: DisplayResult): void;
   finish(text: string): void;

@@ -80,10 +80,13 @@ with tempfile.TemporaryDirectory(prefix='sayrun-ui-', dir='/tmp') as directory:
     zshrc = temp / '.zshrc'
     zshrc.write_text('# preserve my shell\n')
 
-    def run(args, marker=None, answer=None, code=0, width=90):
+    def run(args, marker=None, answer=None, code=0, width=90, choice='\r'):
         terminal = Terminal(args, env, temp, width)
         try:
             if marker:
+                if args[0] == 'setup' and '--approval-mode' not in args:
+                    terminal.until('选择授权模式')
+                    terminal.send(choice)
                 terminal.until(marker)
             if answer is not None:
                 terminal.send(answer)
@@ -104,6 +107,10 @@ with tempfile.TemporaryDirectory(prefix='sayrun-ui-', dir='/tmp') as directory:
     assert '# >>> sayrun >>>' in zshrc.read_text()
     assert list(temp.glob('.zshrc.sayrun.*.bak'))
     print('PASS: setup logo, dry-run, default cancellation, Ctrl-C, apply, and backup', flush=True)
+    run(['setup', '--no-shell'], '应用以上配置？', 'y', choice='\x1b[B\r')
+    assert json.loads(run(['config', 'get', 'approval.mode', '--json']))['value'] == 'normal'
+    run(['config', 'set', 'approval.mode', 'ask'])
+    print('PASS: setup selects normal authorization and config can restore ask', flush=True)
 
     for args, expected in [(['doctor'], '环境检查通过'), (['backend', 'list'], '已注册后端'),
                            (['auth', 'status'], '认证状态'), (['config', 'show', '--effective'], '配置总览'),

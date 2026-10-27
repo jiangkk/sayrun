@@ -14,6 +14,6 @@ export function readAnswer(question = 'sayrun> ') {
   });
 }
 export async function readTask() {
-  report('开始一个任务', [{ text: '用自然语言描述你想做的事。每条命令执行前都会请你确认。' }, { text: '例如：找出当前目录最大的十个文件', tone: 'muted' }, { text: 'Ctrl-C / Ctrl-D 退出 · 每次任务使用独立会话', tone: 'muted' }]);
+  report('开始一个任务', [{ text: '用自然语言描述你想做的事。命令按配置的授权模式执行，默认逐条确认。' }, { text: '例如：找出当前目录最大的十个文件', tone: 'muted' }, { text: 'Ctrl-C / Ctrl-D 退出 · 每次任务使用独立会话', tone: 'muted' }]);
   for (;;) { const answer = await readAnswer(); if (answer === null || answer) return answer; }
 }

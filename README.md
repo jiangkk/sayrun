@@ -8,7 +8,7 @@
 
 **命令照常敲，AI 随时问。**
 
-Sayrun (`sayrun-shell`) is an AI terminal assistant for zsh, powered by your installed DeepSeek Harness (DSH). Ask in natural language, review and approve each command, and continue your existing shell workflow.
+Sayrun (`sayrun-shell`) is an AI terminal assistant for zsh, powered by your installed DeepSeek Harness (DSH). Ask in natural language, choose how commands are authorized, and continue your existing shell workflow.
 
 当前支持 zsh 集成 · 复用已认证的 DSH
 
@@ -76,7 +76,7 @@ Sayrun 复用 DSH 已配置的凭证，无需重复配置 API Key。安装完成
 sayrun setup
 ```
 
-`setup` 使用 OpenTUI 展示 Sayrun 字标、安装预览和确认选项，经确认后备份 zsh 配置文件，并写入终端集成。首次在交互式终端运行时，会自动进入已启用 Sayrun 的新 zsh，随后即可直接输入自然语言；`exit` 返回原终端。已经加载集成的终端运行 `setup` 会直接刷新当前集成。
+`setup` 先选择授权模式，默认一律询问，再使用 OpenTUI 展示 Sayrun 字标、安装预览和确认选项，经确认后备份 zsh 配置文件，并写入终端集成。首次在交互式终端运行时，会自动进入已启用 Sayrun 的新 zsh，随后即可直接输入自然语言；`exit` 返回原终端。已经加载集成的终端运行 `setup` 会直接刷新当前集成。
 
 脚本调用或使用 `--no-shell`、`--temporary`、`--zshrc` 时不会自动启动新 shell。也可以手动在当前交互式 zsh 中启用：
 
@@ -115,7 +115,7 @@ sayrun ask "帮我找出当前目录最大的十个文件，只读取文件信�
 ### 审批与查看结果
 
 1. 查看任务、执行目录和完整命令。
-2. 选择批准、拒绝，或先编辑命令；每条新命令都需要审批。
+2. 选择批准、拒绝，或先编辑命令；默认每条新命令都需要审批。
 3. 查看命令输出和退出状态，必要时回答补充问题。
 4. 阅读任务结论，回到提示符继续操作；启用集成后，同一 zsh 实例和项目中的后续提问默认延续当前会话。
 
@@ -155,7 +155,7 @@ sayrun sessions export <会话ID> --format markdown --output /tmp/task.md
 
 启用 zsh 集成后，同一 shell 实例、项目和后端中的提问默认延续当前会话，每次提问记录为独立 run。普通命令（如 `ls`、`git status`）和重新加载集成不会切断对话；新终端或新启动的 zsh 使用独立会话。同一 Git 项目内切换子目录保留会话，切换项目会使用独立会话，切回来可继续。普通命令的输出不会自动发送给模型，环境变化需在下一轮重新检查。使用 `sayrun ask --new "任务"` 主动开始新对话。
 
-DSH 通过 `session/resume` 恢复原生历史，保留其上下文压缩结果；每轮结束正常关闭后端并保存历史。恢复失败会明确报错，不会静默丢失上下文；可显式使用 `--context-only` 将可见历史作为上下文创建新分支。旧命令不会自动重放，后续执行仍需重新审批。关闭本工具历史时不自动续接会话；未加载 zsh 集成的独立调用仍默认新建，可用 `resume` 显式继续。
+DSH 通过 `session/resume` 恢复原生历史，保留其上下文压缩结果；每轮结束正常关闭后端并保存历史。恢复失败会明确报错，不会静默丢失上下文；可显式使用 `--context-only` 将可见历史作为上下文创建新分支。旧命令不会自动重放，后续执行采用当前授权模式。关闭本工具历史时不自动续接会话；未加载 zsh 集成的独立调用仍默认新建，可用 `resume` 显式继续。
 
 ### 调整常用配置
 
@@ -192,7 +192,7 @@ npm 安装提供命令行程序；直接输入自然语言需要 zsh 已加载�
 
 ### 命令会自动执行吗？
 
-每条命令都需要你明确批准。默认执行器在本机启动独立的 `zsh -f -c`，不加载别名、函数或启动配置；不同命令之间不保留 `cd` / `export`。当前不支持需要交互输入的命令或后台任务，也没有提供操作系统沙箱。
+默认“一律询问”，每条命令都需要你明确批准。可选“普通授权”（非 sudo 命令自动执行）或“完全授权”（进入任务先验证 sudo，之后自动执行；需要提权时仍显式写 sudo）。授权模式可在 `setup` 中选择，或通过 `sayrun config set approval.mode ask|normal|full` 修改。完整说明见[授权模式](docs/guide/usage.md#授权模式)。默认执行器在本机启动独立的 `zsh -f -c`，不加载别名、函数或启动配置；不同命令之间不保留 `cd` / `export`。当前不支持需要交互输入的命令或后台任务，也没有提供操作系统沙箱。
 
 ### 需要哪些运行时？
 

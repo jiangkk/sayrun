@@ -4,6 +4,7 @@ import { invalid } from '../errors.ts';
 import { defaults } from './defaults.ts';
 
 const enums: Record<string, readonly unknown[]> = {
+  'approval.mode': ['ask', 'normal', 'full'],
   'routing.mode': ['auto', 'local', 'explicit'], 'routing.on_ambiguous': ['ask'],
   'ui.mode': ['opentui', 'plain'], 'ui.color': ['auto', 'always', 'never'],
   'approval.default_selection': ['approve', 'reject', 'edit'], 'approval.editor_enter': ['execute', 'save'],

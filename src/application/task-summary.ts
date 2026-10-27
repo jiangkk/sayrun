@@ -25,5 +25,5 @@ export function taskSummary({ facts, blocked, modelText = '', interrupted = fals
     interrupted ? '后端未能完成收尾说明，以上按实际执行记录整理。' : '',
   ].filter(Boolean).join('\n\n');
   const partial = modelText.trim() ? `\n\n**后端已有说明（可能不完整）**\n\n${safeText(modelText)}` : '';
-  return `${lead}${partial}\n\n**已做的事**\n\n${done}\n\n**当前卡点**\n\n${blocker}\n\n**下一步**\n\n请先核实上述未解决的问题或补充所需信息，再继续处理；后续命令仍需重新审批。`;
+  return `${lead}${partial}\n\n**已做的事**\n\n${done}\n\n**当前卡点**\n\n${blocker}\n\n**下一步**\n\n请先核实上述未解决的问题或补充所需信息，再继续处理；后续命令按当前授权模式处理。`;
 }

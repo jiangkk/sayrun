@@ -18,20 +18,25 @@ export async function normalizeCommand(args: CommandInput, defaultCwd: string): 
   return Object.freeze({ command: args.command, description: args.description, cwd });
 }
 
-export function runCommand(proposal: CommandProposal, { signal, onOutput = () => {}, timeoutMs = 30000, maxBytes = 65536, shell = '/bin/zsh', env = process.env }: ExecutionOptions = {}): Promise<ExecutionResult> {
+export function runCommand(proposal: CommandProposal, { signal, onOutput = () => {}, timeoutMs = 30000, maxBytes = 65536, shell = '/bin/zsh', env = process.env, preserveTerminal = false }: ExecutionOptions = {}): Promise<ExecutionResult> {
   return new Promise<ExecutionResult>((resolve, reject) => {
     if (signal?.aborted) return reject(new Error('任务已取消'));
     // Do not hand model credentials or bridge authorization to generated commands.
     const commandEnv = Object.fromEntries(Object.entries(env).filter(([key]) =>
       !/(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTHORIZATION)/i.test(key) &&
       !key.startsWith('TERMINAL_AGENT_') && !key.startsWith('DSH_')));
-    const child = spawn(shell, ['-f', '-c', proposal.command], {
-      cwd: proposal.cwd, env: commandEnv, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+    // sudo's default credentials are scoped to the controlling terminal. zsh's
+    // noninteractive job-control bootstrap creates a separate process group
+    // without setsid(), then closes stdin before running the exact command.
+    // Keep the bootstrap alive so zsh cannot restore its old group via exec.
+    const args = preserveTerminal ? ['-m', '-f', '-c', 'exec </dev/null; unsetopt monitor; "$@"; result=$?; exit $result', 'sayrun', shell, '-f', '-c', proposal.command] : ['-f', '-c', proposal.command];
+    const child = spawn(shell, args, {
+      cwd: proposal.cwd, env: commandEnv, stdio: [preserveTerminal ? 'inherit' : 'ignore', 'pipe', 'pipe'], detached: !preserveTerminal,
     });
     let output = '', bytes = 0, truncated = false, timedOut = false, settled = false;
     let hardKill: ReturnType<typeof setTimeout> | undefined;
     const kill = () => {
-      try { process.kill(-child.pid!, 'SIGTERM'); } catch {}
+      try { process.kill(-child.pid!, 'SIGTERM'); } catch { child.kill('SIGTERM'); }
       hardKill ??= setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL'); } catch {} }, 500);
       hardKill.unref();
     };

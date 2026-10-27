@@ -7,6 +7,7 @@ export interface ExecutionResult {
 export interface ExecutionOptions {
   signal?: AbortSignal; onOutput?: (text: string) => void; timeoutMs?: number;
   maxBytes?: number; shell?: string; env?: NodeJS.ProcessEnv;
+  preserveTerminal?: boolean;
 }
 export interface Executor {
   targetId: string;

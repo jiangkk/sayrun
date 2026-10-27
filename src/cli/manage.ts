@@ -20,8 +20,8 @@ import { closePresentation, notice, report, status } from './presentation.ts';
 
 export async function manage(mode: string, argv: string[]) {
   if (mode === 'setup') {
-    const { opts, args } = options(argv, { values: ['zshrc', 'backend'], flags: ['yes', 'dry-run', 'temporary', 'no-shell'] }); arity(args, 0);
-    const result = await setup({ yes: opts.yes, dryRun: opts['dry-run'], zshrc: opts.zshrc, backend: opts.backend, temporary: opts.temporary });
+    const { opts, args } = options(argv, { values: ['zshrc', 'backend', 'approval-mode'], flags: ['yes', 'dry-run', 'temporary', 'no-shell'] }); arity(args, 0);
+    const result = await setup({ yes: opts.yes, dryRun: opts['dry-run'], zshrc: opts.zshrc, backend: opts.backend, temporary: opts.temporary, mode: opts['approval-mode'] });
     if (!result.applied) return opts['dry-run'] ? 0 : 130;
     status('正在检查本地运行环境');
     const doctorStatus = await doctor();

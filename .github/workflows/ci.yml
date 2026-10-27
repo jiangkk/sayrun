@@ -50,6 +50,7 @@ jobs:
           python3 test/terminal-pty.py
           python3 test/history-pty.py
           python3 test/commands-pty.py
+          python3 test/authorization-pty.py
       - name: Isolated npm package installation
         run: npm run test:package
 

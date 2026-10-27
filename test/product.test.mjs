@@ -14,6 +14,8 @@ import { exportMarkdown } from '../src/history/export.ts';
 import { editShellBlock, shellBlock, shellPlan, applyShellPlan, editorArgv } from '../src/platform/shell-setup.ts';
 import { runAgent } from '../src/application/run-task.ts';
 import { runCommand } from '../src/execution/process-runner.ts';
+import { needsApproval } from '../src/config/approval.ts';
+import { startSudoSession } from '../src/execution/sudo-session.ts';
 import { backendEvent, admitBackend } from '../src/backends/protocol.ts';
 import { DshBackend, dshCapabilities } from '../src/backends/dsh/backend.ts';
 import { convertDsh, migrate } from '../src/history/migrate-dsh.ts';
@@ -138,13 +140,120 @@ function fixture(events, { capabilities = dshCapabilities, onReply = () => {}, e
   return { backend, info };
 }
 const success = { output: 'ok', exitCode: 0, signal: null, timedOut: false, cancelled: false, truncated: false };
-function ui({ approve = (p) => p, answer = () => 'y' } = {}) { return async () => ({ status() {}, output() {}, result() {}, finish() {}, close: async () => {}, approve, requestInput: answer }); }
+function ui({ approve = (p) => p, answer = () => 'y' } = {}) { return async () => ({ status() {}, command() {}, external: (action) => action(), output() {}, result() {}, finish() {}, close: async () => {}, approve, requestInput: answer }); }
 async function coordinate(s, backend, extra = {}) {
   const conf = config(); conf.backends.fixture = { model: 'fixture' }; conf.agent.backend = 'fixture';
-  return runAgent('test', { cwd: s.cwd, config: conf, backend, store: new SessionStore({ env: s.env }), uiFactory: ui(), execute: async () => success,
+  return runAgent('test', { cwd: s.cwd, config: conf, backend, shellId: '', store: new SessionStore({ env: s.env }), uiFactory: ui(), execute: async () => success,
     input: { isTTY: true }, output: { isTTY: true, write() {} }, ...extra });
 }
 const command = { type: 'command.requested', requestId: 'one', command: 'printf original', description: 'purpose', cwd: process.cwd(), targetId: 'local-zsh' };
+
+test('authorization defaults, validation and project trust cannot relax the policy', async (t) => {
+  const s = await sandbox(t);
+  assert.equal((await loadConfig({ cwd: s.cwd, env: s.env })).config.approval.mode, 'ask');
+  assert.throws(() => validateConfig({ approval: { mode: 'invalid' } }), /ask.*normal.*full/);
+  await assert.rejects(saveConfig({ approval: { mode: 'full' } }, { project: true, cwd: s.cwd, env: s.env }), /不允许/);
+  await writeFile(join(s.cwd, '.terminal-agent.toml'), '[approval]\nmode="full"\n');
+  await trustProject(s.cwd, s.env);
+  const loaded = await loadConfig({ cwd: s.cwd, env: s.env });
+  assert.equal(loaded.config.approval.mode, 'ask'); assert.match(loaded.warnings.join(' '), /仅允许用户配置/);
+  for (const text of ['sudo ls', '/usr/bin/sudo ls', 'env sudo ls', 'echo ok; sudo ls', 'echo $(sudo ls)', "'sudo' ls", 's\\udo ls', 'su\\\ndo ls']) {
+    assert.equal(needsApproval('normal', text), true, text);
+  }
+  assert.equal(needsApproval('normal', 'printf hello'), false);
+  assert.equal(needsApproval('ask', 'printf hello'), true);
+  assert.equal(needsApproval('full', 'sudo ls'), false);
+});
+
+test('normal authorization executes ordinary commands once, approves sudo separately and records policy decisions', async (t) => {
+  const s = await sandbox(t), conf = config(); conf.approval.mode = 'normal';
+  const ordinary = { ...command, cwd: s.cwd }, privileged = { ...ordinary, requestId: 'sudo', command: 'sudo true' };
+  const peer = fixture([ordinary, ordinary, privileged]); let approvals = 0, executions = 0, auth = 0;
+  const result = await coordinate(s, peer.backend, { config: conf,
+    authorizeSudo: async () => { auth++; throw new Error('must not authenticate rejected command'); },
+    uiFactory: ui({ approve: (proposal) => { approvals++; assert.equal(proposal.command, 'sudo true'); return null; } }),
+    execute: async (proposal) => { executions++; assert.equal(proposal.command, ordinary.command); return success; },
+  });
+  assert.equal(result.exitCode, 3); assert.equal(executions, 1); assert.equal(approvals, 1); assert.equal(auth, 0);
+  const events = (await new SessionStore({ env: s.env }).read(result.sessionId)).events;
+  assert.equal(events.find((event) => event.type === 'command.decided').source, 'policy:normal');
+  assert.ok(events.findIndex((event) => event.type === 'command.decided') < events.findIndex((event) => event.type === 'execution.started'));
+});
+
+test('full authorization validates once, displays exact automatic commands and closes credentials', async (t) => {
+  const s = await sandbox(t), conf = config(); conf.approval.mode = 'full';
+  const peer = fixture([{ ...command, cwd: s.cwd }, { ...command, cwd: s.cwd, requestId: 'two', command: 'sudo true' }]);
+  let auth = 0, checks = 0, closes = 0; const displayed = [], executed = [];
+  const result = await coordinate(s, peer.backend, { config: conf,
+    authorizeSudo: async () => { auth++; return { check: async () => { checks++; }, close: async () => { closes++; } }; },
+    uiFactory: async (...args) => ({ ...await ui({ approve: () => { throw new Error('unexpected approval'); } })(...args), command: (proposal) => displayed.push(proposal.command) }),
+    execute: async (proposal, options) => { assert.equal(options.preserveTerminal, true); executed.push(proposal.command); return success; },
+  });
+  assert.equal(result.exitCode, 0); assert.equal(auth, 1); assert.equal(checks, 2); assert.equal(closes, 1);
+  assert.deepEqual(displayed, ['printf original', 'sudo true']); assert.deepEqual(executed, displayed);
+});
+
+test('failed sudo authorization or expired credentials stop before execution and clean up', async (t) => {
+  const s = await sandbox(t), conf = config(); conf.approval.mode = 'full'; let executions = 0, closes = 0;
+  const execute = async () => { executions++; return success; };
+  await assert.rejects(coordinate(s, fixture([{ ...command, cwd: s.cwd }]).backend, { config: conf, execute,
+    authorizeSudo: async () => { throw new Error('authentication refused'); } }), /authentication refused/);
+  await assert.rejects(coordinate(s, fixture([{ ...command, cwd: s.cwd }]).backend, { config: conf, execute,
+    authorizeSudo: async () => ({ check: async () => { throw new Error('expired'); }, close: async () => { closes++; } }) }), /expired/);
+  assert.equal(executions, 0); assert.equal(closes, 1);
+});
+
+test('sudo refresh is noninteractive, failures propagate and close aborts outstanding work', async () => {
+  const calls = [], stop = new AbortController(); let failed;
+  const failure = new Promise((resolve) => { failed = resolve; });
+  const session = await startSudoSession({ signal: stop.signal, refreshMs: 5, onFailure: failed,
+    run: async (interactive) => { calls.push(interactive); if (!interactive) throw new Error('expired'); } });
+  const watchdog = setTimeout(() => failed(new Error('refresh never ran')), 1000);
+  assert.match((await failure).message, /expired/); clearTimeout(watchdog);
+  await session.close(); const count = calls.length;
+  await new Promise((resolve) => setTimeout(resolve, 20)); assert.equal(calls.length, count); assert.deepEqual(calls, [true, false]);
+  let refreshSignal;
+  const pendingSession = await startSudoSession({ signal: stop.signal, onFailure() {}, run: async (interactive, signal) => {
+    if (!interactive) { refreshSignal = signal; await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true })); }
+  } });
+  const pending = pendingSession.check(); await Promise.resolve(); await pendingSession.close(); await pending;
+  assert.equal(refreshSignal.aborted, true);
+});
+
+test('automatic authorization still refuses replay conflicts and write failures before execution', async (t) => {
+  const s = await sandbox(t), conf = config(); conf.approval.mode = 'normal'; let executions = 0;
+  const proposal = { ...command, cwd: s.cwd };
+  await assert.rejects(coordinate(s, fixture([proposal, { ...proposal, command: 'printf changed' }]).backend, { config: conf,
+    execute: async () => { executions++; return success; } }), /内容发生变化/);
+  assert.equal(executions, 1);
+  const store = new SessionStore({ env: s.env }), begin = store.begin.bind(store);
+  store.begin = async (...args) => { const writer = await begin(...args), append = writer.append.bind(writer); writer.append = (type, details) => {
+    if (type === 'execution.started') throw new Error('disk full'); return append(type, details);
+  }; return writer; };
+  await assert.rejects(coordinate(s, fixture([proposal]).backend, { config: conf, store,
+    execute: async () => { executions++; return success; } }), /历史写入失败/);
+  assert.equal(executions, 1);
+});
+
+test('initial sudo authentication pauses the activity budget and can be cancelled before UI or model connection', async (t) => {
+  const s = await sandbox(t), conf = config(); conf.approval.mode = 'full'; conf.history.enabled = false;
+  const result = await coordinate(s, fixture([]).backend, { config: conf, taskTimeoutMs: 100,
+    authorizeSudo: async ({ signal }) => {
+      await new Promise((resolve) => setTimeout(resolve, 150)); assert.equal(signal.aborted, false);
+      return { check: async () => {}, close: async () => {} };
+    } });
+  assert.equal(result.exitCode, 0);
+  const stop = new AbortController(); let uiCreated = false, connected = false;
+  const peer = fixture([]); peer.backend.connect = async () => { connected = true; throw new Error('unexpected model connection'); };
+  await assert.rejects(coordinate(s, peer.backend, { config: conf, signal: stop.signal,
+    uiFactory: async () => { uiCreated = true; throw new Error('unexpected UI'); },
+    authorizeSudo: (options) => startSudoSession({ ...options, run: async (_, signal) => {
+      setTimeout(() => stop.abort(), 5);
+      await new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('auth aborted')), { once: true }));
+    } }),
+  }), (error) => error.exitCode === 130);
+  assert.equal(uiCreated, false); assert.equal(connected, false);
+});
 
 test('backend-independent Coordinator edits exact command, persists before reply, separates answers and deduplicates requests', async (t) => {
   const s = await sandbox(t), proposal = { ...command, cwd: s.cwd }; let executions = 0;
@@ -427,7 +536,12 @@ test('setup CLI applies idempotently, uninstalls its block, and shell wrapper to
   const before = await readFile(zshrc, 'utf8'); assert.equal(cli(s, 'setup', '--dry-run', '--zshrc', zshrc).status, 0); assert.equal(await readFile(zshrc, 'utf8'), before);
   const first = cli(s, 'setup', '--yes', '--zshrc', zshrc); assert.equal(first.status, 0, first.stdout);
   assert.match(first.stdout, /当前终端立即启用：eval/);
+  assert.equal(JSON.parse(cli(s, 'config', 'get', 'approval.mode', '--json').stdout).value, 'ask');
+  assert.equal(cli(s, 'setup', '--yes', '--approval-mode', 'invalid', '--zshrc', zshrc).status, 2);
+  assert.equal(cli(s, 'setup', '--yes', '--approval-mode', 'normal', '--zshrc', zshrc).status, 0);
+  assert.equal(JSON.parse(cli(s, 'config', 'get', 'approval.mode', '--json').stdout).value, 'normal');
   const once = await readFile(zshrc, 'utf8'); const second = cli(s, 'setup', '--yes', '--zshrc', zshrc); assert.equal(second.status, 0, second.stdout); assert.equal(await readFile(zshrc, 'utf8'), once);
+  assert.equal(JSON.parse(cli(s, 'config', 'get', 'approval.mode', '--json').stdout).value, 'normal');
   assert.equal(cli(s, 'shell', 'uninstall', '--yes', '--zshrc', zshrc).status, 0); assert.equal(await readFile(zshrc, 'utf8'), before);
   const source = new URL('../shell/sayrun.zsh', import.meta.url).pathname;
   const toggle = spawnSync('/bin/zsh', ['-f', '-i', '-c', 'source "$1" >/dev/null; ta shell off; ta shell status; sayrun shell on; sayrun shell status', 'test', source], { env: { ...process.env, ...s.env }, encoding: 'utf8' });

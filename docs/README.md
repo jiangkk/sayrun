@@ -7,7 +7,7 @@
 | 你要做什么 | 阅读入口 |
 | --- | --- |
 | 了解项目、安装并尝试第一次任务 | [项目首页](../README.md) |
-| 查找命令、配置、会话恢复和执行限制 | [使用手册](guide/usage.md) |
+| 查找命令、授权模式、配置、会话恢复和执行限制 | [使用手册](guide/usage.md) |
 | 编写外部后端适配器 | [后端协议参考](reference/backend-protocol.md) |
 | 理解源码结构与模块职责 | [项目结构与职责](development/architecture.md) |
 | 准备开发环境、构建和选择测试 | [构建与测试](development/testing.md) |

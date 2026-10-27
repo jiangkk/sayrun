@@ -2,7 +2,7 @@
   "name": "sayrun-shell",
   "version": "0.1.6",
   "type": "module",
-  "description": "Sayrun: an AI terminal assistant for zsh. Use natural language, approve each command, and keep your shell workflow. Powered by your installed DeepSeek Harness (DSH).",
+  "description": "Sayrun: an AI terminal assistant for zsh. Use natural language, choose command authorization, and keep your shell workflow. Powered by your installed DeepSeek Harness (DSH).",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jiangkk/sayrun.git"
@@ -42,7 +42,7 @@
   "scripts": {
     "test": "node --import tsx --test test/*.test.mjs && bun test test/ui.test.ts",
     "preview": "node dist/sayrun.js preview",
-    "test:pty": "python3 test/terminal-pty.py && python3 test/history-pty.py && python3 test/commands-pty.py",
+    "test:pty": "python3 test/terminal-pty.py && python3 test/history-pty.py && python3 test/commands-pty.py && python3 test/authorization-pty.py",
     "doctor": "node dist/sayrun.js doctor",
     "test:package": "python3 test/package-install.py",
     "test:dsh": "node --import tsx test/dsh-native-smoke.mjs",

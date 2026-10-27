@@ -26,6 +26,25 @@ test('shutdown destroys the renderer even when waiting for idle fails', async ()
   } finally { s.renderer.idle = originalIdle; s.renderer.destroy(); }
 });
 
+test('automatic execution shows each exact command without creating an approval interaction', async () => {
+  const s = await setup(50, 16);
+  try {
+    s.ui.command(proposal, 1, 8);
+    await s.renderOnce();
+    expect(s.captureCharFrame()).toContain('正在执行');
+    expect(s.captureCharFrame()).toContain('printf ORIGINAL');
+    s.ui.result({ output: 'first', exitCode: 0, signal: null, timedOut: false, cancelled: false, truncated: false });
+    s.ui.command({ ...proposal, command: 'printf SECOND' }, 2, 8);
+    await s.renderOnce();
+    expect(s.captureCharFrame()).toContain('printf SECOND');
+    s.ui.result({ output: 'second', exitCode: 0, signal: null, timedOut: false, cancelled: false, truncated: false });
+    expect(s.externalOutput.takeText()).toContain('printf ORIGINAL');
+    const manual = s.ui.approve(proposal, 3, 8);
+    s.mockInput.pressKey('n');
+    expect(await manual).toBeNull();
+  } finally { await s.ui.close(); }
+});
+
 test('Enter approves by default; switching selection can still reject', async () => {
   const s = await setup();
   try {

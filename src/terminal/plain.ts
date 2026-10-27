@@ -18,7 +18,9 @@ export class PlainUi implements TerminalUi {
   host: string;
   transcript: StepTranscript;
   closed = false;
+  input: UiOptions['input'];
   constructor({ input, output, onCancel, signal, uiConfig = {}, approvalConfig = {} }: UiOptions) {
+    this.input = input;
     this.readline = createInterface({ input, output });
     this.readline.on('SIGINT', onCancel);
     this.readline.on('close', () => { if (!this.closed) onCancel(); });
@@ -53,6 +55,17 @@ export class PlainUi implements TerminalUi {
     return proposal;
   }
   output(text: string) { this.transcript.append(text); }
+  command(proposal: CommandProposal, count: number, max: number) {
+    write(`\n[自动执行 ${count}/${max}] ${proposal.description}\n目录：${proposal.cwd}\n${proposal.command}\n`);
+    this.transcript.start(proposal, count);
+  }
+  async external<T>(action: () => Promise<T>) {
+    const wasRaw = this.input.isRaw;
+    this.readline.pause();
+    this.input.setRawMode?.(false);
+    try { return await action(); }
+    finally { if (!this.closed) { this.input.setRawMode?.(wasRaw); this.readline.resume(); } }
+  }
   result(result: DisplayResult) { this.transcript.complete(result); }
   finish(text: string) { write(`\n[agent] ${text}\n`); }
   async close() { this.closed = true; this.readline.close(); }

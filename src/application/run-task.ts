@@ -22,6 +22,9 @@ import { ShellSession } from '../history/shell-session.ts';
 import { AgentError } from '../errors.ts';
 import { safeText } from '../terminal/display.ts';
 import { writeJson } from '../platform/atomic-file.ts';
+import { needsApproval, mentionsSudo, approvalModes } from '../config/approval.ts';
+import { startSudoSession } from '../execution/sudo-session.ts';
+import type { SudoSession } from '../execution/sudo-session.ts';
 
 // Coordinator owns approval, ordering, execution and persistence. Backend details
 // stay behind AgentBackend; tests may supply any implementation of the contract.
@@ -31,6 +34,7 @@ export interface RunAgentOptions {
   executor?: Executor; execute?: Executor['execute']; maxCommands?: number; maxSteps?: number;
   maxQuestions?: number; taskTimeoutMs?: number; signal?: AbortSignal; resumeRef?: string; store?: SessionStore;
   newSession?: boolean; shellId?: string; summaryTimeoutMs?: number;
+  authorizeSudo?: typeof startSudoSession;
 }
 export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
   const { input = process.stdin, output = process.stdout, backend: suppliedBackend,
@@ -48,6 +52,7 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
   let ui: TerminalUi | undefined, session: BackendSession | undefined, writer: RunWriter | undefined;
   let volatile: string | undefined, store: SessionStore | undefined, fatal: Error | undefined;
   let shellSession: ShellSession | undefined;
+  let sudo: SudoSession | undefined;
   let closing = false, denied = false, limited = false;
   let summarizing = false, summarySteps = 0, summaryText = '', blocked: string | undefined;
   let limitReason = '', summaryInterrupted = false, summaryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -115,9 +120,14 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
       volatile = await mkdtemp(join(tmpdir(), 'ta-run-'));
       await writeJson(join(volatile, 'state.json'), { runId, pid: process.pid, status: 'starting' });
     }
+    if (config.approval.mode === 'full') {
+      output.write('完全授权：正在验证 sudo；命令仍按原文和原有用户身份执行。\n');
+      sudo = await humanInput(() => (options.authorizeSudo ?? startSudoSession)({ signal: controller.signal, onFailure: cancel }));
+      assertActive();
+    }
     ui = await uiFactory({ prompt, cwd, input, output, onCancel: onSignal, signal: controller.signal,
       backendName: backend.id, uiConfig: config.ui, approvalConfig: config.approval });
-    ui.status(`${resumeRef ? '正在继续会话' : '正在连接'} ${backend.id}`);
+    ui.status(`${approvalModes.find((mode) => mode.value === config.approval.mode)?.name ?? '一律询问'} · ${resumeRef ? '正在继续会话' : '正在连接'} ${backend.id}`);
     // Cancellation also covers a backend stuck during connect/initialize.
     const connecting = backend.connect({ cwd, targetId, model: config.backends[backend.id]?.model, initialContext,
       ephemeral, resumeRef, resumeHome: resumeRef ? resumeMeta?.nativeHome : undefined, signal: controller.signal });
@@ -220,8 +230,9 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
         commandCount++;
         const proposal = await executor.normalize(event, cwd);
         await persist('command.requested', { requestId, proposedCommand: proposal.command, cwd: proposal.cwd, targetId });
-        await state('awaiting_approval');
-        const approved = await humanInput(() => ui!.approve(proposal, commandCount, limits.commands)); assertActive();
+        const automatic = !needsApproval(config.approval.mode ?? 'ask', proposal.command);
+        if (!automatic) await state('awaiting_approval');
+        const approved = automatic ? proposal : await humanInput(() => ui!.approve(proposal, commandCount, limits.commands)); assertActive();
         if (!approved) {
           denied = true;
           reply = { requestId, kind: 'command', approved: false, reason: 'User rejected the command. Stop this task.' };
@@ -230,14 +241,20 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
         }
         const exact = await executor.normalize(approved, cwd);
         if (exact.cwd !== proposal.cwd) throw new AgentError('protocol_error', '审批后执行目录发生变化');
-        const executionId = randomUUID(), decisionSource = approved.decisionSource ?? (exact.command === proposal.command ? 'approve' : 'edit');
+        const executionId = randomUUID(), decisionSource = automatic ? `policy:${config.approval.mode}` : approved.decisionSource ?? (exact.command === proposal.command ? 'approve' : 'edit');
         await persist('command.decided', { requestId, approved: true, source: decisionSource, executedCommand: exact.command });
+        if (mentionsSudo(exact.command) && !sudo) {
+          sudo = await humanInput(() => ui!.external(() => (options.authorizeSudo ?? startSudoSession)({ signal: controller.signal, onFailure: cancel })));
+        }
+        if (sudo) await sudo.check();
+        assertActive();
+        if (automatic) ui.command(exact, commandCount, limits.commands);
         await state('executing');
         await persist('execution.started', { requestId, executionId, proposedCommand: proposal.command, executedCommand: exact.command, cwd: exact.cwd, targetId, decisionSource });
         if (volatile) await writeJson(join(volatile, 'state.json'), { runId, executionId, status: 'executing' });
         assertActive();
         const result = await execute(exact, { signal: controller.signal, shell: config.execution.shell, timeoutMs: config.execution.timeout_seconds * 1000,
-          maxBytes: config.execution.max_output_bytes, onOutput: (text) => {
+          maxBytes: config.execution.max_output_bytes, preserveTerminal: !!sudo, onOutput: (text) => {
             if (controller.signal.aborted) return;
             try { ui!.output(safeText(text)); }
             // Output arrives on a child-process stream callback. Cancel through
@@ -272,6 +289,7 @@ export async function runAgent(prompt: string, options: RunAgentOptions = {}) {
     closing = true; budget.pause(); clearTimeout(summaryTimer);
     // Abort outstanding tool requests before tearing down the terminal.
     controller.abort();
+    await sudo?.close().catch((e) => { caught ??= e; });
     await session?.close().catch((e) => { caught ??= e; if (status === 'completed') status = 'failed'; });
     process.removeListener('SIGINT', onSignal); process.removeListener('SIGTERM', onSignal); signal?.removeEventListener('abort', onSignal);
     try { await writer?.finish(status, caught ? { error: caught.code ?? 'run_failed', message: safeText(caught.message) } : {}); }

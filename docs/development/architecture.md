@@ -58,14 +58,14 @@ test/
   → cli/main 解析命令、加载配置
   → application/run-task 协调任务
   → Backend 返回统一事件
-  → TerminalUi 展示命令并等待审批
+  → 按用户授权模式等待审批或展示自动执行命令
   → Executor 执行批准后的准确命令
   → RunWriter 保存实际结果
   → Backend 收到结果并继续
   → 关闭界面、打印结论
 ```
 
-协调器掌握审批、执行、预算与持久化顺序。后端负责模型协议适配，不能直接读取宿主终端或绕过审批执行命令。回答问题与批准命令属于两种独立交互。
+协调器掌握审批、执行、预算与持久化顺序。后端负责模型协议适配，不能直接读取宿主终端或绕过宿主授权策略执行命令。回答问题与批准命令属于两种独立交互。
 
 ## 逐文件职责
 
@@ -106,12 +106,14 @@ test/
 | `src/backends/dsh/terminal-tool.ts` | 独立构建的 DSH 插件，注册命令 / 问题工具，通过带令牌的 Unix socket 交回宿主。 |
 | `src/backends/process/backend.ts` | manifest、环境白名单、外部后端握手、消息关联、事件流和子进程回收。 |
 | `src/execution/local-zsh.ts` | Executor 的本地实现，绑定 targetId、shell、超时和输出限制。 |
-| `src/execution/process-runner.ts` | 校验并冻结命令、规范化 cwd、过滤敏感环境变量、采集输出、超时、取消与进程组终止。 |
+| `src/execution/process-runner.ts` | 校验并冻结命令、规范化 cwd、过滤敏感环境变量、采集输出、超时、取消与进程组终止；sudo 模式保留控制终端及独立进程组，命令 stdin 仍关闭。 |
 
 ### 配置与历史
 
 | 文件 | 内容与职责 |
 | --- | --- |
+| `src/config/approval.ts` | 三种授权模式定义、参数校验和 sudo 文本识别；项目配置不得覆盖。 |
+| `src/execution/sudo-session.ts` | 直接调用系统 sudo 验证及刷新凭据，取消与退出时清理刷新进程。 |
 | `src/config/defaults.ts` | 完整有效配置的默认值。 |
 | `src/config/schema.ts` | 字段 / 类型 / 枚举 / profile 校验，配置路径读取、更新与 flatten。 |
 | `src/config/load.ts` | TOML 读写、用户 / profile / 项目 / 环境 / CLI 合并、来源记录、摘要信任和保存备份。 |
@@ -168,6 +170,7 @@ test/
 | `test/transcript.test.mjs` | Markdown、换行、控制字符清理和输出摘要。 |
 | `test/build.test.mjs` | 独立 JS 入口、构建资产、插件 exports 和生成的 shell 集成。 |
 | `test/ui.test.ts` | Bun 下 OpenTUI 的渲染、审批、编辑、追问、管理交互、窄窗口和滚动。 |
+| `test/authorization-pty.py` / `test/fixture-authorization.mjs` | sudo 替身下的自动执行、控制终端保留、Ctrl-C 子进程清理及两种 UI 回归。 |
 | `test/commands-pty.py` | 构建后的管理界面、setup 写入/取消、任务输入交接和历史选择的真实终端回归。 |
 | `test/dsh-native-smoke.mjs` | 使用本机 DSH 与本地模拟模型服务，验证原生会话跨进程恢复。 |
 | `test/export.test.mjs` | 公开源码快照的白名单、排除项、目标路径和符号链接检查。 |

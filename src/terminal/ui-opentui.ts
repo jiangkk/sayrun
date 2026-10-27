@@ -372,6 +372,20 @@ export class OpenTuiUi implements TerminalUi {
     }
   }
 
+  command(proposal: CommandProposal, count: number, max: number) {
+    this.proposal = proposal; this.draft = proposal.command; this.commandCount = count;
+    this.phase = '正在执行';
+    this.context.content = `${hostname()} · ${safeText(proposal.cwd)}`;
+    this.caption.content = `${count}/${max}  按授权模式自动执行 · ${safeText(proposal.description)}`;
+    this.card.title = ' 正在执行 ';
+    this.card.borderColor = this.colors.accent;
+    this.commandText.content = this.previewText(proposal.command);
+    this.transcript.start(proposal, count); this.paint();
+  }
+  async external<T>(action: () => Promise<T>) {
+    await this.renderer.suspend();
+    try { return await action(); } finally { if (!this.closed) await this.renderer.resume(); }
+  }
   output(text: string) {
     this.transcript.append(text);
     this.commandText.content = safeText(`${this.draft}\n\n${this.transcript.buffer.slice(-4000)}`);
