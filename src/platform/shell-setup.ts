@@ -48,10 +48,9 @@ export async function confirm(question: string) {
   try { return /^(y|yes)$/i.test((await rl.question(`${question} [y/N] `)).trim()); }
   finally { rl.close(); process.stdin.pause(); }
 }
-export async function setup({ yes = false, dryRun = false, zshrc, backend = 'dsh', temporary = false, mode }: { yes?: boolean; dryRun?: boolean; zshrc?: string; backend?: string; temporary?: boolean; mode?: string } = {}) {
-  if (backend !== 'dsh') throw invalid('当前内置后端为 dsh；外部适配器请使用 backend add');
-  const paths = productPaths(), plan = temporary ? null : await shellPlan({ path: zshrc });
-  const existing = await readConfig(paths.configFile);
+export async function setup({ yes = false, dryRun = false, zshrc, backend, temporary = false, mode }: { yes?: boolean; dryRun?: boolean; zshrc?: string; backend: string; temporary?: boolean; mode?: string }) {
+  const paths = productPaths(), existing = await readConfig(paths.configFile);
+  const plan = temporary ? null : await shellPlan({ path: zshrc });
   let selected = approvalMode(mode ?? existing.approval?.mode ?? 'ask');
   if (mode === undefined && !yes && !dryRun && process.stdin.isTTY && process.stdout.isTTY) {
     const choices = [...approvalModes].sort((a, b) => Number(b.value === selected) - Number(a.value === selected));
@@ -73,7 +72,7 @@ export async function setup({ yes = false, dryRun = false, zshrc, backend = 'dsh
     { text: '把想做的事交给终端，按你选择的授权模式执行。', tone: 'muted' },
     { text: '' },
     { text: '01  安装预览', heading: true, tone: 'accent' },
-    { text: `默认后端  ${backend}` },
+    { text: `默认 Agent  ${backend}` },
     { text: `授权模式  ${approvalModes.find((choice) => choice.value === selected)!.name}（${selected}）` },
     { text: `配置  ${paths.configFile}` },
     { text: `历史  ${paths.data}` },
@@ -95,7 +94,7 @@ export async function setup({ yes = false, dryRun = false, zshrc, backend = 'dsh
   }
   status('正在保存配置与 Shell 集成');
   const config = await readConfig(paths.configFile);
-  config.agent ??= {}; config.agent.backend = backend;
+  config.agent ??= {}; config.agent.engine = backend;
   config.approval ??= {}; config.approval.mode = selected;
   await saveConfig(config);
   for (const path of [paths.data, paths.state, paths.cache]) await privateDir(path);

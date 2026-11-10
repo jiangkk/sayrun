@@ -110,7 +110,12 @@ with tempfile.TemporaryDirectory(prefix="ta-history-", dir="/tmp") as temp:
     assert len(json.loads(cli("sessions", "list", "--json"))) == 1
     print("PASS: resume view is offline and Enter returns without creating a run", flush=True)
 
-    cli("config", "set", "agent.backend", "unregistered-default")
+    meta_path = Path(env["TA_HOME"]) / "data" / "sessions" / original / "meta.json"
+    legacy_meta = json.loads(meta_path.read_text())
+    agent = legacy_meta["config"]["agent"]
+    agent["backend"] = agent.pop("engine")
+    meta_path.write_text(json.dumps(legacy_meta))
+    cli("config", "set", "agent.engine", "unregistered-default")
     task(["resume", "--last", "--prompt", "显式继续检查"])
     rows = json.loads(cli("sessions", "list", "--json"))
     assert len(rows) == 1 and rows[0]["sessionId"] == original

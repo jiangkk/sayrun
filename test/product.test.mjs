@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { loadConfig, saveConfig, trustProject } from '../src/config/load.ts';
+import { loadConfig, readConfig, saveConfig, trustProject } from '../src/config/load.ts';
 import { defaults } from '../src/config/defaults.ts';
 import { validateConfig } from '../src/config/schema.ts';
 import { SessionStore } from '../src/history/store.ts';
@@ -26,13 +26,83 @@ async function sandbox(t) {
   t.after(() => rm(dir, { recursive: true, force: true })); return { dir, env, cwd };
 }
 const config = () => structuredClone(defaults);
+const configValues = async (path) => JSON.parse(JSON.stringify(await readConfig(path)));
 const cliPath = new URL('../dist/sayrun.js', import.meta.url).pathname;
 const cli = (s, ...args) => spawnSync(process.execPath, [cliPath, ...args], { env: { ...process.env, ...s.env }, cwd: s.cwd, encoding: 'utf8' });
+
+test('user configuration writes all defaults and guidance without activating optional examples', async (t) => {
+  const s = await sandbox(t), path = await saveConfig({}, { env: s.env });
+  assert.deepEqual(await configValues(path), defaults);
+  const text = await readFile(path, 'utf8');
+  assert.match(text, /ask：一律询问.*normal：非 sudo.*full：/);
+  assert.match(text, /单条命令超时（秒/);
+  assert.match(text, /# credentials =/);
+  assert.match(text, /# manifest =/);
+  assert.match(text, /# version =/);
+  assert.match(text, /# \[profiles.ops.agent\]/);
+  const project = await saveConfig({ ui: { mode: 'plain' } }, { project: true, cwd: s.cwd, env: s.env });
+  assert.deepEqual(await configValues(project), { schema_version: 1, ui: { mode: 'plain' } });
+  const context = '引号 " 与换行\n[approval]\nmode="full"\n';
+  await saveConfig({ context: { text: context } }, { env: s.env });
+  assert.equal((await readConfig(path)).context.text, context);
+  assert.equal((await readConfig(path)).approval.mode, 'ask');
+});
+
+test('config init fills old files, preserves saved values and backups, and excludes effective overrides', async (t) => {
+  const s = await sandbox(t), path = productPaths(s.env).configFile;
+  await mkdir(join(s.env.TA_HOME, 'config'), { recursive: true });
+  const original = 'schema_version=1\n[agent]\nmax_steps=23\n[approval]\nmode="normal"\n[backends.custom]\nmanifest="/tmp/example.json"\ndisabled=true\n[profiles.ops.agent]\nmax_steps=31\n';
+  await writeFile(path, original);
+  await saveConfig({ ui: { mode: 'plain' } }, { project: true, cwd: s.cwd, env: s.env });
+  s.env.TERMINAL_AGENT_MODEL = 'temporary-model';
+  const result = cli(s, 'config', 'init'); assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(await readFile(`${path}.bak`, 'utf8'), original);
+  const saved = await configValues(path);
+  assert.equal(saved.agent.max_steps, 23); assert.equal(saved.agent.max_commands, 15);
+  assert.equal(saved.approval.mode, 'normal'); assert.equal(saved.ui.mode, defaults.ui.mode);
+  assert.equal(saved.backends.dsh.model, defaults.backends.dsh.model);
+  assert.deepEqual(saved.backends.custom, { manifest: '/tmp/example.json', disabled: true });
+  assert.deepEqual(saved.profiles, { ops: { agent: { max_steps: 31 } } });
+  assert.equal(JSON.parse(cli(s, 'config', 'show', '--effective', '--profile', 'ops', '--json').stdout).config.agent.max_steps, 31);
+  const once = await readFile(path, 'utf8');
+  assert.equal(cli(s, 'config', 'init').status, 0); assert.equal(await readFile(path, 'utf8'), once);
+  assert.equal(cli(s, 'config', 'set', 'execution.timeout_seconds', '45').status, 0);
+  assert.equal((await readConfig(path)).execution.timeout_seconds, 45);
+  assert.match(await readFile(path, 'utf8'), /单条命令超时（秒/);
+  await writeFile(path, '[approval]\nmode="invalid"\n');
+  assert.equal(cli(s, 'config', 'init').status, 2);
+  assert.equal(await readFile(path, 'utf8'), '[approval]\nmode="invalid"\n');
+});
+
+test('config init creates complete defaults without setup and config edit offers defaults or repairs invalid input', async (t) => {
+  const s = await sandbox(t), path = productPaths(s.env).configFile;
+  assert.equal(cli(s, 'config', 'init').status, 0);
+  assert.deepEqual(await configValues(path), defaults);
+  const editor = join(s.dir, 'editor.cjs');
+  await writeFile(editor, `const fs = require('node:fs'), assert = require('node:assert/strict');
+    const path = process.argv[2], text = fs.readFileSync(path, 'utf8');
+    assert.match(text, /max_commands = 15/); assert.match(text, /# 单条命令超时/);
+    fs.writeFileSync(path, text.replace('max_commands = 15', 'max_commands = 21'));
+  `);
+  s.env.EDITOR = `${process.execPath} "${editor}"`; s.env.VISUAL = '';
+  await rm(path);
+  assert.equal(cli(s, 'config', 'edit').status, 0);
+  assert.equal((await readConfig(path)).agent.max_commands, 21);
+  await writeFile(path, '[broken');
+  await writeFile(editor, `const fs = require('node:fs'), assert = require('node:assert/strict');
+    const path = process.argv[2]; assert.equal(fs.readFileSync(path, 'utf8'), '[broken');
+    fs.writeFileSync(path, '[ui]\\nmode="plain"\\n');
+  `);
+  const repair = cli(s, 'config', 'edit'); assert.equal(repair.status, 0, repair.stdout + repair.stderr);
+  assert.equal((await readConfig(path)).ui.mode, 'plain');
+  assert.equal((await readConfig(path)).approval.mode, 'ask');
+  assert.equal(await readFile(`${path}.bak`, 'utf8'), '[broken');
+});
 
 test('TOML precedence, provenance, scoped trust, protected fields and profile limits', async (t) => {
   const s = await sandbox(t);
   await saveConfig({ agent: { max_commands: 5 }, backends: { dsh: { model: 'user' } }, profiles: { ops: { agent: { max_commands: 7 } } } }, { env: s.env });
-  await saveConfig({ ui: { mode: 'plain' }, agent: { max_commands: 9, backend: 'registered' }, backends: { dsh: { model: 'project' } } }, { project: true, cwd: s.cwd, env: s.env });
+  await saveConfig({ ui: { mode: 'plain' }, agent: { max_commands: 9, engine: 'registered' }, backends: { dsh: { model: 'project' } } }, { project: true, cwd: s.cwd, env: s.env });
   let loaded = await loadConfig({ cwd: s.cwd, env: s.env, profile: 'ops' });
   assert.equal(loaded.config.agent.max_commands, 7); assert.equal(loaded.config.ui.mode, 'plain'); assert.match(loaded.warnings.join(' '), /config trust/);
   await trustProject(s.cwd, s.env);
@@ -142,7 +212,7 @@ function fixture(events, { capabilities = dshCapabilities, onReply = () => {}, e
 const success = { output: 'ok', exitCode: 0, signal: null, timedOut: false, cancelled: false, truncated: false };
 function ui({ approve = (p) => p, answer = () => 'y' } = {}) { return async () => ({ status() {}, command() {}, external: (action) => action(), output() {}, result() {}, finish() {}, close: async () => {}, approve, requestInput: answer }); }
 async function coordinate(s, backend, extra = {}) {
-  const conf = config(); conf.backends.fixture = { model: 'fixture' }; conf.agent.backend = 'fixture';
+  const conf = config(); conf.backends.fixture = { model: 'fixture' }; conf.agent.engine = 'fixture';
   return runAgent('test', { cwd: s.cwd, config: conf, backend, shellId: '', store: new SessionStore({ env: s.env }), uiFactory: ui(), execute: async () => success,
     input: { isTTY: true }, output: { isTTY: true, write() {} }, ...extra });
 }
@@ -537,6 +607,7 @@ test('setup CLI applies idempotently, uninstalls its block, and shell wrapper to
   s.env.TERMINAL_AGENT_DSH_BIN = new URL('./fixture-dsh.mjs', import.meta.url).pathname;
   const before = await readFile(zshrc, 'utf8'); assert.equal(cli(s, 'setup', '--dry-run', '--zshrc', zshrc).status, 0); assert.equal(await readFile(zshrc, 'utf8'), before);
   const first = cli(s, 'setup', '--yes', '--zshrc', zshrc); assert.equal(first.status, 0, first.stdout);
+  assert.deepEqual(await configValues(productPaths(s.env).configFile), defaults);
   assert.match(first.stdout, /当前终端立即启用：eval/);
   assert.equal(JSON.parse(cli(s, 'config', 'get', 'approval.mode', '--json').stdout).value, 'ask');
   assert.equal(cli(s, 'setup', '--yes', '--approval-mode', 'invalid', '--zshrc', zshrc).status, 2);
@@ -604,4 +675,48 @@ test('a dead owner lock is recovered once; concurrent writers cannot steal a liv
   const results = await Promise.allSettled(Array.from({ length: 8 }, () => store.lock(meta.sessionId)));
   const successful = results.filter((r) => r.status === 'fulfilled'); assert.equal(successful.length, 1);
   await successful[0].value();
+});
+
+test('setup reports installation steps and does not write anything without a compatible Agent', async (t) => {
+  const s = await sandbox(t), zshrc = join(s.dir, '.zshrc');
+  const before = '# user shell settings\n';
+  await writeFile(zshrc, before);
+  s.env.PATH = s.dir;
+  s.env.TERMINAL_AGENT_DSH_BIN = join(s.dir, 'missing-dsh');
+  for (const flag of ['--dry-run', '--yes']) {
+    const result = cli(s, 'setup', flag, '--zshrc', zshrc);
+    assert.equal(result.status, 5, result.stdout + result.stderr);
+    assert.match(result.stdout, /未找到可用的 Agent/);
+    assert.match(result.stdout, /npm install -g @deepseek-ai\/dsh/);
+    assert.match(result.stdout, /https:\/\/developers.openai.com\/codex\/cli/);
+    assert.equal(await readFile(zshrc, 'utf8'), before);
+    await assert.rejects(readFile(productPaths(s.env).configFile), { code: 'ENOENT' });
+  }
+});
+
+test('agent.engine is canonical while legacy user, profile and trusted project keys still work', async (t) => {
+  const s = await sandbox(t), { configFile, config } = productPaths(s.env);
+  await mkdir(config, { recursive: true });
+  await writeFile(configFile, '[agent]\nbackend="codex"\n[profiles.ops.agent]\nbackend="fixture"\n');
+  assert.equal((await loadConfig({ cwd: s.cwd, env: s.env })).config.agent.engine, 'codex');
+  assert.equal((await loadConfig({ cwd: s.cwd, env: s.env, profile: 'ops' })).config.agent.engine, 'fixture');
+  const project = join(s.cwd, '.terminal-agent.toml');
+  await writeFile(project, '[agent]\nbackend="project-agent"\n');
+  const { createHash } = await import('node:crypto');
+  const legacyDigest = createHash('sha256').update('{"agent.backend":"project-agent"}').digest('hex');
+  await writeFile(join(config, 'trust.json'), JSON.stringify({ [await realpath(s.cwd)]: legacyDigest }));
+  const loaded = await loadConfig({ cwd: s.cwd, env: s.env });
+  assert.equal(loaded.config.agent.engine, 'project-agent');
+  assert.equal(loaded.trusted, true);
+  assert.equal(loaded.sources['agent.engine'], `project:${await realpath(s.cwd)}`);
+  assert.equal(JSON.parse(cli(s, 'config', 'get', 'agent.backend', '--json').stdout).value, 'project-agent');
+
+  assert.equal(cli(s, 'config', 'set', 'agent.backend', 'dsh').status, 0);
+  const saved = await readFile(configFile, 'utf8');
+  assert.match(saved, /engine = "dsh"/);
+  assert.match(saved, /\[profiles\.ops\.agent\]\nengine = "fixture"/);
+  assert.doesNotMatch(saved, /^backend\s*=/m);
+  assert.match(await readFile(project, 'utf8'), /backend="project-agent"/);
+  await writeFile(configFile, '[agent]\nengine="codex"\nbackend="dsh"\n');
+  assert.equal((await readConfig(configFile)).agent.engine, 'codex');
 });

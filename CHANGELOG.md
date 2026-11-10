@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 移除独立的 `backend` 命令。使用 `setup` 检测并选择 Agent，使用 `config set agent.engine <name>` 切换默认 Agent，使用 `doctor --engine <name>` 检查指定工具。
 - 同一 zsh 实例、项目和后端中的连续提问复用会话；普通命令与集成重新加载不会切断对话，`ask --new` 可开始新会话。
 - DSH 通过原生 session 恢复上下文，恢复失败明确报错；可显式使用 `--context-only` 创建可见历史分支。
 - 使用 MIT 许可证，补充贡献、安全与发布文档；清理测试中的业务信息，提供不带旧 Git 历史的源码导出。

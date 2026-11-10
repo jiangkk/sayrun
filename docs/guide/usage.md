@@ -4,11 +4,11 @@
 
 本文面向使用 Sayrun 的用户，说明安装、日常任务、配置、历史和故障处理。在现有 zsh 提示符输入自然语言，在同一个终端按授权模式执行命令、查看结果和最终结论。任务结束后返回 shell；启用集成后，同一 zsh 实例、项目和后端中的后续提问默认延续当前会话，未加载集成的独立调用默认新建会话。
 
-目前内置 **DSH adapter**，使用 DSH 的 `sdk-minimal` profile，不限制版本号。审批、执行、配置和历史通过统一后端契约工作；没有接入 Codex、Claude，也没有实现自己的模型循环。
+Sayrun 内置 **DSH** 和 **Codex** 后端，默认使用 DSH。两者共用命令审批、执行、预算和历史流程，各自管理原生会话。
 
 ## 安装与首次使用
 
-需要 Node.js >= 22、zsh，以及 PATH 中已完成认证的 DSH。Sayrun 复用 DSH 的凭证。npm 包固定安装 Bun 1.4.3、OpenTUI 0.6.6，不需要额外全局安装 Bun。
+需要 Node.js >= 22、zsh，以及已安装并认证的 DSH 或 Codex CLI。Sayrun 复用 DSH 的凭证，Codex 使用独立的登录目录。npm 包固定安装 Bun 1.4.3、OpenTUI 0.6.6，不需要额外全局安装 Bun。
 
 OpenTUI 当前声明 Node.js >= 26.4.0。Sayrun 在 Bun 中运行界面，Node.js 22 已通过安装与终端回归；npm 默认模式可能提示 `EBADENGINE`，开启 `engine-strict` 时则需要 Node.js 26.4.0+。
 
@@ -24,9 +24,29 @@ sayrun ask "找出当前目录最大的十个文件，只读取文件信息"
 
 已发布到 npm。源码也可通过 `npm install`、`npm pack` 构建 tarball，再全局安装；暂未提供 Homebrew 安装。已在 macOS / arm64 验证；Linux 和其他架构仍需要实际发布测试。
 
-`setup` 会先选择授权模式，首次默认“一律询问”，重复设置时默认保留已有模式。也可用 `sayrun setup --approval-mode ask|normal|full` 指定；`--yes` 或 `--dry-run` 不弹出选择器，保留已有模式（未配置时为 `ask`）。随后默认用 OpenTUI 展示品牌字标，以及配置、历史和 zshrc 的修改计划，经确认后创建备份，只管理自己的标记区块。重复执行不会添加多个区块。首次在交互式终端配置后，会自动进入已加载集成的新 zsh，可以直接输入自然语言；`exit` 返回原终端。已经加载集成时，会直接刷新当前 shell，不再嵌套新 shell。
+`setup` 在写入配置和 zsh 启动文件前，先检查 DSH 和 Codex 的可执行文件与本地兼容性。只有一个可用时直接选中，两个都可用时可在交互界面选择。找不到可用工具时会显示安装指引，可安装后重新检测，或退出并保留原文件。检测只读取本地状态。如果缺少认证，会提示运行对应的 `sayrun auth login <dsh|codex>` 查看指引。
 
-`--yes` 可显式跳过确认；`--no-shell` 仅完成配置，不启用当前终端；`--zshrc /path/.zshrc` 指定文件；`--temporary` 只初始化配置和存储。非交互式调用和后两种选项均不会启动新 shell，会显示手动启用命令；已加载集成的终端仍会在成功配置后刷新，除非指定 `--no-shell`。取消确认时退出码为 130，不改变当前集成状态。
+选定 Agent 后，`setup` 会选择授权模式，首次默认“一律询问”，重复设置时默认保留已有模式。也可用 `sayrun setup --approval-mode ask|normal|full` 指定；`--yes` 或 `--dry-run` 不弹出选择器，保留已有模式（未配置时为 `ask`）。随后默认用 OpenTUI 展示品牌字标，以及配置、历史和 zshrc 的修改计划，经确认后创建备份，只管理自己的标记区块。重复执行不会添加多个区块。首次在交互式终端配置后，会自动进入已加载集成的新 zsh，可以直接输入自然语言；`exit` 返回原终端。已经加载集成时，会直接刷新当前 shell，不再嵌套新 shell。
+
+`--yes` 可显式跳过确认；`--no-shell` 仅完成配置，不启用当前终端；`--zshrc /path/.zshrc` 指定文件；`--temporary` 只初始化配置和存储。非交互式调用和后两种选项均不会启动新 shell，会显示手动启用命令；已加载集成的终端仍会在成功配置后刷新，除非指定 `--no-shell`。取消确认时退出码为 130。找不到可用 Agent 时，非交互和预览模式返回 5。非交互设置保留已保存的默认 Agent，如需切换可显式传入 `--engine dsh|codex`。
+
+### 使用 Codex
+
+先安装 [Codex CLI](https://developers.openai.com/codex/cli)，使 `codex` 位于 PATH；也可用 `sayrun config set backends.codex.binary /absolute/path/codex` 指定可执行文件。适配器需要 App Server 支持动态工具及显式关闭执行环境，旧版本会在能力检查中被拒绝。
+
+```zsh
+sayrun doctor --engine codex
+sayrun auth login codex
+# 运行上一条命令显示的官方 codex login 命令，完成 Sayrun 专用目录的认证。
+sayrun ask --engine codex "帮我检查当前目录"
+sayrun config set agent.engine codex  # 可选，保存为用户默认 Agent
+```
+
+首次 setup 可用 `sayrun setup --engine codex` 选择 Codex。登录、配置和原生会话位于 Sayrun 数据目录的 `backends/codex/`，例如 `$TA_HOME/data/backends/codex/`。此目录与日常 Codex 的登录和配置独立。使用 `--model <name>` 或 `backends.codex.model` 可指定模型；留空使用 Codex 默认模型。
+
+Codex 通过 App Server 把命令提案与追问交给 Sayrun，仍由 Sayrun 审批、执行和保存结果。Codex 的原生执行环境、插件、MCP 和 hooks 不用于 Sayrun 任务。Codex 后端暂未接入模型分类，歧义输入会询问用户；也可用 `routing.classifier = "dsh"` 选择已配置的 DSH 分类器。
+
+### 临时启用 zsh 集成
 
 也可仅在当前交互式 zsh 中启用：
 
@@ -34,7 +54,7 @@ sayrun ask "找出当前目录最大的十个文件，只读取文件信息"
 eval "$(sayrun shell init zsh)"
 ```
 
-初始化脚本不连接模型。明确命令、alias、函数、多行续行继续交给原有 zsh；歧义输入使用独立、无工具的分类请求，失败或置信度不足时询问用户。旧版 `ta` 简写仍保留兼容；若已被命令、alias 或函数占用则保留原定义，请使用 `sayrun`。
+初始化脚本不连接模型。明确命令、alias、函数、多行续行继续交给原有 zsh；支持分类的后端可通过独立的无工具请求处理歧义输入；不可用、失败或置信度不足时询问用户。旧版 `ta` 简写仍保留兼容；若已被命令、alias 或函数占用则保留原定义，请使用 `sayrun`。
 
 ```zsh
 sayrun shell off
@@ -62,7 +82,7 @@ sayrun ask --new "开始一个新任务"
 sayrun "帮我找最大的文件"     # 明确的自然语言快捷入口
 sayrun -- "doctor"            # 强制任务文本，避免管理命令冲突
 sayrun ask --profile ops "检查服务"
-sayrun ask --backend dsh --model deepseek-flash "检查构建"
+sayrun ask --engine dsh --model deepseek-flash "检查构建"
 sayrun preview                # 无模型、无命令执行的 UI 预览
 ```
 
@@ -117,6 +137,7 @@ sayrun config set approval.mode ask
 ## 配置与 profile
 
 ```zsh
+sayrun config init                 # 创建或补齐完整用户配置，保留已有值
 sayrun config show --effective --json
 sayrun config get execution.timeout_seconds
 sayrun config set agent.max_commands 20
@@ -131,13 +152,17 @@ sayrun config trust .
 
 配置采用 TOML schema 1，默认 `~/.config/terminal-agent/config.toml`，遵循 `XDG_CONFIG_HOME`。`config edit` 编辑临时副本，校验通过才原子替换原配置；修改前保存 `.bak`。`$EDITOR` 支持带引号的 argv，不执行 shell 替换。
 
+`setup`、`config init` 以及保存用户配置（如 `config set`、`config edit`）会将当前版本的全部默认字段写入文件，附上中文用途、枚举选项和单位，并保留已有的用户值、外部后端和 profile。已有用户可运行 `sayrun config init` 补齐新字段；此命令不修改 zsh 启动文件或连接模型。读取配置不会自动改写文件。环境变量、项目配置和选中的 profile 不会被固化进用户配置。默认值一旦写入即成为用户配置，后续补齐只添加缺失字段，不改变已有值；保存会重新生成说明和排版，不保留自定义注释。
+
+凭证路径没有固定默认字符串（跟随 `DSH_HOME`，默认 `~/.dsh/.credentials.yaml`），外部后端和 profile 默认也没有条目，因此使用注释示例列出，避免启用无效路径或后端。文件还会标明 schema 接受但当前不生效的后端字段；例如 `version` 仅为保留元数据，不用于版本校验。项目配置继续只写显式设置的字段，不填充用户默认值，以免影响其他使用者或触碰受限字段。
+
 生效顺序：默认 → 用户配置 → 显式 profile → 当前项目允许的字段 → 环境变量 → CLI。`show --effective` 展示每个值的来源与忽略项目字段的原因。
 
 ```toml
 schema_version = 1
 
 [agent]
-backend = "dsh"
+engine = "dsh"
 max_commands = 15
 max_steps = 15
 max_questions = 5
@@ -181,15 +206,26 @@ binary = "dsh"
 model = "deepseek-flash"
 api_key_env = "DEEPSEEK_API_KEY"
 disabled = false
+# 可选；不设置时复用已有 DSH 凭证，不要把示例路径直接启用
+# credentials = "/absolute/path/.credentials.yaml"
+
+[backends.codex]
+binary = "codex"
+disabled = false
+# model = "your-model"
 
 [context]
-text = "当前项目的说明；作为上下文数据，不构成命令执行授权。"
+text = ""                       # 默认无附加上下文；不构成命令执行授权
 
-[profiles.ops.agent]
-max_commands = 12
+# 以下按需启用，默认没有外部后端或 profile
+# [backends.example]
+# manifest = "/absolute/path/adapter.json"
+# disabled = false
 
-[profiles.ops.execution]
-timeout_seconds = 60
+# [profiles.ops.agent]
+# max_commands = 12
+# [profiles.ops.execution]
+# timeout_seconds = 60
 ```
 
 项目配置是最近 Git 根目录的 `.terminal-agent.toml`；非 Git 项目只读取当前任务目录。默认允许 UI 和项目上下文。后端选择、预算、路由和后端模型需要 `config trust .`。信任绑定目录 realpath 和配置摘要，内容改变后需要重新信任。
@@ -215,23 +251,25 @@ timeout_seconds = 60
 ## 后端、认证与诊断
 
 ```zsh
-sayrun backend list --json
-sayrun backend info dsh
-sayrun backend check dsh
-sayrun backend use dsh
+sayrun config get agent.engine
+sayrun config set agent.engine codex
+sayrun config show --effective
+sayrun doctor
+sayrun doctor --engine dsh
 sayrun auth status dsh
 sayrun auth login dsh
-sayrun doctor
 sayrun doctor --live
 sayrun version --json
 sayrun update --check
 ```
 
-本地 probe 检查后端可用性、报告版本和适配器声明的能力；DSH 不按版本号拦截，实际连接时仍需支持 `sdk-minimal` 和所用协议。不满足命令编辑、提问和取消能力的适配器在任务前拒绝运行，不自动换服务。只有 `--live` 才发送最小模型探测，并提示可能产生用量。
+本地 probe 检查后端可用性、报告版本和适配器声明的能力；DSH 不按版本号拦截，实际连接时仍需支持 `sdk-minimal` 和所用协议。不满足命令编辑、提问和取消能力的适配器在任务前拒绝运行，不自动换服务。支持分类的后端可用 `--live` 发送最小模型探测，可能产生用量。Codex 的本地检查只读取版本和协议能力。
 
 DSH 优先使用配置指定的 API key 环境变量，否则使用已有 DSH 凭证服务。`auth status` 只展示来源、环境变量是否设置、文件是否存在，不读取或显示密钥，也不将文件存在描述为认证有效。`auth login dsh` 给出 API key / 官方凭证配置说明，不读取桌面 App 内部 token。
 
-`backend use` 只改变用户默认字段，当前项目仍有覆盖时会解释有效值与来源。内置 DSH 可通过 `config set backends.dsh.disabled true` 禁用，`backend remove dsh` 等价。重新启用设为 `false`。
+`config set agent.engine <name>` 保存用户默认 Agent。用 `config show --effective` 查看项目覆盖后的值与来源，用 `doctor --engine <name>` 检查指定 Agent 的本地可用性。可通过 `config set backends.<name>.disabled true` 禁用 Agent，重新启用时设为 `false`。
+
+已有 `agent.backend` 配置仍可读取，保存时写为 `agent.engine`。同一配置层同时出现两者时，以 `engine` 为准。旧 `--backend` 参数仍可使用。独立的 `backend` 命令已移除，原来的切换和检查操作分别使用 `config set agent.engine` 和 `doctor --engine`。
 
 `update --check` 仅查询 registry，不安装。通过 npm 全局安装的用户可运行 `npm install -g sayrun-shell@latest` 更新，其他渠道按原方式安装；不会在 shell 启动或任务中自动升级。
 
@@ -239,7 +277,7 @@ DSH 优先使用配置指定的 API key 环境变量，否则使用已有 DSH �
 
 ```zsh
 sayrun sessions
-sayrun sessions list --all --backend dsh --status failed --json
+sayrun sessions list --all --engine dsh --status failed --json
 sayrun sessions list --include-classifier
 sayrun sessions show <id> --full
 sayrun sessions search "NXDOMAIN" --all
@@ -257,7 +295,7 @@ sayrun sessions reindex
 sayrun resume <id>                         # 先查看，输入新请求后才调用模型
 sayrun resume --last --prompt "再检查一次"
 sayrun resume <id> --context-only --prompt "使用可见历史继续"
-sayrun sessions fork <id> --backend dsh --context summary
+sayrun sessions fork <id> --engine dsh --context summary
 ```
 
 逻辑 `sessionId`、每次请求的 `runId` 和厂商 `nativeRef` 分开记录。唯一短 ID 可用；前缀不唯一时明确列出候选。默认按本机稳定身份和项目 realpath 过滤，`--last` 不自动恢复其他项目。
@@ -266,15 +304,15 @@ sayrun sessions fork <id> --backend dsh --context summary
 
 启用 zsh 集成后，同一 shell 实例、项目和后端中的提问默认延续当前会话，每次提问记录为独立 run。普通命令和重新加载集成不会切断对话；新终端或新启动的 zsh 使用独立会话。同一 Git 项目内切换子目录保留会话，切换项目会使用独立会话，切回来可继续。普通命令的输出不会自动发送给模型。使用 `sayrun ask --new "任务"` 主动开始新对话；关闭本工具历史时不自动续接。
 
-DSH 使用 `session/resume` 恢复原生历史，保留其上下文压缩结果；每轮结束正常关闭后端并保存历史。恢复失败会明确报错，不会静默改为新会话。显式使用 `resume --context-only` 会创建基于可见历史的新分支，保留 `parentSessionId` 并展示将发送的事件范围。可见上下文包括用户请求、命令执行事实、有限输出、问题回答和结论，默认上限 32 KiB；不额外调用模型生成摘要。`fork --context summary` 同样表示这份本地可见事实摘要。恢复与分支都不会重放旧工具调用，后续命令按当前授权模式处理。
+DSH 使用 `session/resume`，Codex 使用 `thread/resume` 恢复原生历史。每轮结束正常关闭后端并保存历史。恢复失败会明确报错，不会静默改为新会话。显式使用 `resume --context-only` 会创建基于可见历史的新分支，保留 `parentSessionId` 并展示将发送的事件范围。可见上下文包括用户请求、命令执行事实、有限输出、问题回答和结论，默认上限 32 KiB；不额外调用模型生成摘要。`fork --context summary` 同样表示这份本地可见事实摘要。恢复与分支都不会重放旧工具调用，后续命令按当前授权模式处理。
 
 恢复沿用记录的后端、模型、目录和执行配置快照，当前更严格的预算优先，执行器、授权与保存策略使用当前用户配置。目录缺失时停止；更换后端要显式 fork。第三方适配器声明并实现 native resume 时可通过 `resumeRef` 复用；原生引用失效可显式使用 `resume --context-only`。
 
 历史导入只保存为只读记录，不启动后端、不执行任何工具。恢复导入记录会创建新分支。JSON 导出包含版本、事件和受管理输出附件；Markdown 方便阅读。`--preview` 不写出文件；`--redact` 做常见凭证模式和项目路径的尽力脱敏，仍应自行检查导出内容。
 
-删除与 GC 跳过活动会话，GC 排除固定会话；归档与固定独立。默认不自动 GC。删除只移除本工具统一历史，厂商原生会话保留并报告其位置，不遍历删除用户其他 DSH 会话。
+删除与 GC 跳过活动会话，GC 排除固定会话；归档与固定独立。默认不自动 GC。删除只移除本工具统一历史，厂商原生会话保留并报告其位置，不遍历删除用户其他原生会话。
 
-`history.enabled=false` 关闭本工具的任务内容保存，仍保留最小运行状态；**DSH 可能继续保存原生记录**。DSH 不能验证关闭原生持久化，因此 `ask --ephemeral` 在连接前明确拒绝。
+`history.enabled=false` 关闭本工具的任务内容保存，仍保留最小运行状态；后端仍可能保存原生记录。Codex 支持 `ask --ephemeral`，这会同时关闭该任务的 Sayrun 历史和 Codex 原生线程持久化。DSH 不支持此选项。
 
 ## 旧数据迁移
 
@@ -313,10 +351,10 @@ sayrun config show --effective
 外部插件需要显式注册；不提供插件市场或自动安装任意包。适配器作者请阅读[后端协议参考](../reference/backend-protocol.md)。
 
 ```zsh
-sayrun backend add custom --manifest /absolute/path/adapter.json
-sayrun backend check custom
-sayrun ask --backend custom "任务"
-sayrun backend remove custom
+sayrun config set backends.custom.manifest /absolute/path/adapter.json
+sayrun doctor --engine custom
+sayrun ask --engine custom "任务"
+sayrun config set backends.custom.disabled true
 ```
 
 开发 Sayrun 本身请从[贡献指南](../../CONTRIBUTING.md)开始；构建与测试见[开发文档](../development/testing.md)。

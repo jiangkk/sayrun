@@ -1,7 +1,9 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import type { PendingReply, WireObject } from '../../contracts/wire.ts';
+import type { PendingReply, WireObject } from '../contracts/wire.ts';
 import { createInterface } from 'node:readline';
-import { AgentError } from '../../errors.ts';
+import { AgentError } from '../errors.ts';
+
+export type RpcId = number | string;
 
 export class LineRpc {
   onFailure: (error: Error) => void;
@@ -10,7 +12,10 @@ export class LineRpc {
   pending: Map<number, PendingReply<WireObject>>;
   lines: ReturnType<typeof createInterface>;
   failure?: Error;
-  constructor(child: ChildProcessWithoutNullStreams, onNotification: (method: string, params: WireObject) => void, onFailure: (error: Error) => void = () => {}) {
+  constructor(child: ChildProcessWithoutNullStreams, onNotification: (method: string, params: WireObject) => void, onFailure: (error: Error) => void = () => {}, private options: {
+    name?: string; omitVersion?: boolean; onRequest?: (id: RpcId, method: string, params: WireObject) => void;
+  } = {}) {
+    const name = options.name ?? 'DSH';
     this.onFailure = onFailure;
     this.child = child;
     this.nextId = 1;
@@ -19,8 +24,8 @@ export class LineRpc {
     this.lines.on('line', (line) => {
       if (this.failure) return;
       let message;
-      try { message = JSON.parse(line); } catch { return this.fail(new Error('DSH stdout 包含非 JSON-RPC 数据')); }
-      if (!message || typeof message !== 'object' || Array.isArray(message)) return this.fail(new Error('DSH 消息不是 JSON-RPC 对象'));
+      try { message = JSON.parse(line); } catch { return this.fail(new Error(`${name} stdout 包含非 JSON-RPC 数据`)); }
+      if (!message || typeof message !== 'object' || Array.isArray(message)) return this.fail(new Error(`${name} 消息不是 JSON-RPC 对象`));
       // Stream callbacks run outside the task's try/catch. Route malformed
       // messages and adapter failures through the same connection failure path.
       try {
@@ -29,7 +34,10 @@ export class LineRpc {
           const params = message.params === undefined ? {} : message.params;
           if (!params || typeof params !== 'object' || Array.isArray(params)) throw new Error('params 必须是对象');
           if (message.id !== undefined) {
-            child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: 'Unsupported request' } }) + '\n');
+            const id: unknown = message.id;
+            if (typeof id !== 'string' && !Number.isSafeInteger(id)) throw new Error('无效请求 ID');
+            if (options.onRequest) options.onRequest(id as RpcId, message.method, params);
+            else this.send({ id, error: { code: -32601, message: 'Unsupported request' } });
           } else onNotification(message.method, params);
           return;
         }
@@ -41,11 +49,11 @@ export class LineRpc {
         if (message.error) pending.reject(new Error(message.error.message));
         else pending.resolve(message.result);
       } catch (error) {
-        this.fail(new AgentError('protocol_error', `DSH 消息处理失败：${error instanceof Error ? error.message : String(error)}`));
+        this.fail(new AgentError('protocol_error', `${name} 消息处理失败：${error instanceof Error ? error.message : String(error)}`));
       }
     });
     child.on('error', (e) => this.fail(e));
-    child.on('close', (code, signal) => this.fail(new Error(`DSH 已退出 (${signal ?? code})`)));
+    child.on('close', (code, signal) => this.fail(new Error(`${name} 已退出 (${signal ?? code})`)));
     child.stdin.on('error', (e) => this.fail(e));
   }
 
@@ -55,11 +63,17 @@ export class LineRpc {
     return new Promise<WireObject>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`DSH ${method} 超时`));
+        reject(new Error(`${this.options.name ?? 'DSH'} ${method} 超时`));
       }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
-      this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+      try { this.send({ id, method, params }); }
+      catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
     });
+  }
+
+  send(message: object) {
+    if (this.failure) throw this.failure;
+    this.child.stdin.write(JSON.stringify(this.options.omitVersion ? message : { jsonrpc: '2.0', ...message }) + '\n');
   }
 
   fail(error: Error) {

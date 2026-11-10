@@ -4,13 +4,19 @@
 
 本文面向后端适配器作者，定义 host-tools 能力、进程传输、请求与事件语义。共享类型见 [`src/contracts/backend.ts`](../../src/contracts/backend.ts)，接入命令见[使用手册](../guide/usage.md#外部后端)。
 
-Coordinator、执行器、历史和 UI 不读取 DSH 原始事件；新后端实现 `src/contracts/backend.ts` 即可复用相同流程。目前内置 DSH，没有内置模型循环。
+Coordinator、执行器、历史和 UI 不读取 DSH 原始事件；新后端实现 `src/contracts/backend.ts` 即可复用相同流程。内置 DSH 和 Codex，各自复用原生模型循环。
 
 适配器必须运行在 host-tools 模式：工具请求只提出命令，host 按用户授权模式审批或自动授权、执行并返回真实结果；需要人工审批时可编辑命令。授权策略仅由 host 决定，后端不能声明跳过审批。不能限制原生执行、文件写入、其他 MCP 或委派工具的后端必须将 `hostTools` 报为 false。仅提示词约束不构成能力证明。此契约不是 OS 沙箱。
 
+## Codex 适配器
+
+Codex 通过 [App Server](https://developers.openai.com/codex/app-server) 的标准输入输出传输。适配器要求 CLI schema 支持动态工具和显式关闭执行环境，使用独立的登录及会话目录，并在连接时核对生效配置。新建线程和每次开始 turn 时都显式禁用执行环境；命令与问题通过 `item/tool/call` 转成宿主事件。只有当前线程、当前 turn 的 Sayrun 工具请求可以进入审批或问答流程。
+
+App Server 的请求 ID 用于传输应答，`callId` 用于宿主去重。适配器按初始 turn 和工具结果后的可见模型轮次报告 status。原生恢复依赖 Codex 持久化的线程和工具定义，旧调用不能获得新的执行权限。
+
 ## 进程插件
 
-仅显式 `backend add <name> --manifest /absolute/path/adapter.json` 注册用户信任的本机代码：
+在用户配置中通过 `sayrun config set backends.<name>.manifest /absolute/path/adapter.json` 显式注册信任的本机代码。manifest 内容示例
 
 ```json
 {

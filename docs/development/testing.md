@@ -15,7 +15,7 @@ npm ci --registry=https://registry.npmjs.org
 npm test
 ```
 
-常规测试使用确定性后端替身，无需安装 DSH、配置密钥或调用真实模型。替身验证宿主行为与协议交互，不代表真实 DSH 或模型已经通过兼容性验证。
+常规测试使用确定性后端替身，无需安装 DSH、配置密钥或调用真实模型。替身验证宿主行为与协议交互，不代表本机 DSH、Codex 或真实模型已经通过兼容性验证。
 
 ## 构建与运行
 
@@ -36,11 +36,12 @@ npm test
 | `npm run test:pty` | 自动构建，运行真实终端中的任务、历史与管理命令回归 | Python 3、zsh、可创建 PTY 和 Unix socket |
 | `npm run test:build` | 构建后验证独立 JS 入口、DSH 插件和生成资产 | 不连接真实模型 |
 | `npm run test:package` | 清理旧产物、打包、安装到临时 prefix，在仓库外和只读安装目录验证 CLI、UI 与 shell | Python 3、registry 或完整缓存 |
+| `npm run test:codex` | 使用本机 Codex 验证动态工具、宿主结果与跨进程恢复 | PATH 中有兼容的 Codex CLI；使用临时目录、本机模拟模型和测试密钥 |
 | `npm run test:dsh` | 使用本机 DSH 验证原生会话跨进程恢复 | PATH 中已有 DSH；请求发往本机临时服务，使用测试密钥 |
 
 `test:package` 不覆盖用户的全局安装。完全离线时设置 `TERMINAL_AGENT_PACKAGE_TEST_OFFLINE=1`，可用 `TERMINAL_AGENT_PACKAGE_TEST_CACHE` 指定预热的 npm 缓存。缓存不完整时仍可能失败。
 
-`test:dsh` 不连接真实模型，也不代表所有 DSH 版本已验证。手动运行真实模型任务或 `doctor --live` 可能产生模型用量，验证记录需明确区分替身、本机 DSH 和真实模型。
+`test:dsh` 不连接真实模型，也不代表所有 DSH 版本已验证。`test:codex` 同样只连接回环模型替身。手动运行真实模型任务或 `doctor --live` 可能产生模型用量，验证记录需明确区分替身、本机 DSH 和真实模型。
 
 ## 按改动选择验证
 
@@ -51,6 +52,7 @@ npm test
 | 审批、执行、取消、预算、配置与持久化 | `npm test`；覆盖批准与拒绝、失败与清理、执行与保存顺序等受影响行为 |
 | 终端布局、输入与 zsh 集成 | `npm test`、`npm run test:pty`；检查窄终端、Plain 与 OpenTUI、Ctrl-C 后恢复 |
 | 入口、Bun 加载、构建或分发资产 | `npm run test:build`、`npm run test:package`；验证仓库外安装路径 |
+| Codex 原生恢复与动态工具 | 对应替身用例；有本机 Codex 时补 `npm run test:codex` |
 | DSH 原生恢复与桥接 | 对应替身用例；有本机 DSH 时补 `npm run test:dsh` |
 | 发布候选版本 | 按[发布验证清单](releasing.md#发布验证)执行 |
 

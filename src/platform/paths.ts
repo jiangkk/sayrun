@@ -14,6 +14,10 @@ export function runtimeHome(env = process.env) {
   return resolve(env.TERMINAL_AGENT_HOME || (env.TA_HOME ? join(resolve(env.TA_HOME), 'data/backends/dsh/default') : '') || join(env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'terminal-agent/dsh'));
 }
 
+export function codexHome() {
+  return join(productPaths().data, 'backends/codex');
+}
+
 export function credentialsPath(env = process.env) {
   return resolve(env.TERMINAL_AGENT_CREDENTIALS || join(env.DSH_HOME || join(homedir(), '.dsh'), '.credentials.yaml'));
 }

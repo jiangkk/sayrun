@@ -30,12 +30,14 @@ export function setKey(value: object, key: string, next: unknown) {
   for (const part of parts.slice(0, -1)) { ref[part] ??= {}; if (!object(ref[part])) throw invalid(`配置路径冲突：${key}`); ref = ref[part]; }
   ref[parts.at(-1)!] = next;
 }
+export const canonicalConfigKey = (key: string) => key === 'agent.backend' ? 'agent.engine' : key.replace(/^(profiles\.[\w-]+\.agent)\.backend$/, '$1.engine');
+
 export function validateConfig(value: unknown, { profile = false } = {}) {
   if (!object(value)) throw invalid('配置必须是 TOML 对象');
   for (const [key, v] of Object.entries(flatten(value))) {
     if (key.split('.').some((p) => ['__proto__', 'prototype', 'constructor'].includes(p))) throw invalid('不安全的配置键');
     if (key.startsWith('profiles.') && !profile) continue;
-    let expected = getKey(defaults, key);
+    let expected = getKey(defaults, canonicalConfigKey(key));
     if (expected === undefined && /^backends\.[\w-]+\.(binary|model|api_key_env|credentials|manifest|version)$/.test(key)) expected = '';
     if (expected === undefined && /^backends\.[\w-]+\.disabled$/.test(key)) expected = false;
     if (expected === undefined) throw invalid(`未知配置项：${key}`);
@@ -53,4 +55,14 @@ export function validateConfig(value: unknown, { profile = false } = {}) {
     validateConfig(config, { profile: true });
   }
   return value;
+}
+
+export function normalizeConfig(value: unknown) {
+  const config = validateConfig(value);
+  for (const layer of [config, ...Object.values(config.profiles ?? {})]) {
+    if (!object(layer) || !object(layer.agent) || !Object.hasOwn(layer.agent, 'backend')) continue;
+    layer.agent.engine ??= layer.agent.backend;
+    delete layer.agent.backend;
+  }
+  return config;
 }

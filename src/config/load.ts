@@ -8,17 +8,21 @@ import { projectRoot } from '../platform/project-root.ts';
 import { atomicWrite, readJson, writeJson } from '../platform/atomic-file.ts';
 import { invalid } from '../errors.ts';
 import { defaults } from './defaults.ts';
-import { flatten, setKey, validateConfig } from './schema.ts';
+import { flatten, normalizeConfig, setKey, validateConfig } from './schema.ts';
+import { userConfigTemplate } from './template.ts';
 
-export async function readConfig(path: string): Promise<ConfigPatch> {
+async function readRawConfig(path: string) {
   try { return validateConfig(parse(await readFile(path, 'utf8'))) as ConfigPatch; }
   catch (e) { if (e.code === 'ENOENT') return {}; throw invalid(`${path}：${e.message}`); }
+}
+export async function readConfig(path: string): Promise<ConfigPatch> {
+  return normalizeConfig(await readRawConfig(path)) as ConfigPatch;
 }
 const safeProject = (key: string) => key.startsWith('ui.') || key.startsWith('context.');
 const trustedProject = (key: string) => /^(agent\.|execution\.(timeout_seconds|max_output_bytes)|routing\.|backends\.[\w-]+\.model$)/.test(key);
 const digest = (value: object) => createHash('sha256').update(JSON.stringify(flatten(value))).digest('hex');
 export async function trustProject(cwd = process.cwd(), env = process.env) {
-  const root = await projectRoot(cwd), config = await readConfig(join(root, '.terminal-agent.toml'));
+  const root = await projectRoot(cwd), config = await readRawConfig(join(root, '.terminal-agent.toml'));
   const path = join(productPaths(env).config, 'trust.json');
   const trust = await readJson<Record<string, string>>(path, {});
   trust[root] = digest(config); await writeJson(path, trust);
@@ -26,7 +30,7 @@ export async function trustProject(cwd = process.cwd(), env = process.env) {
 }
 export async function loadConfig({ cwd = process.cwd(), profile, cli = {}, env = process.env }: { cwd?: string; profile?: string; cli?: ConfigPatch; env?: NodeJS.ProcessEnv } = {}) {
   const paths = productPaths(env), root = await projectRoot(cwd);
-  const user = await readConfig(paths.configFile), project = await readConfig(join(root, '.terminal-agent.toml'));
+  const user = await readConfig(paths.configFile), project = await readRawConfig(join(root, '.terminal-agent.toml'));
   const config = structuredClone(defaults), sources: Record<string, string> = {}, warnings: string[] = [];
   const merge = (value: object, source: string) => { for (const [key, v] of Object.entries(flatten(value))) { if (!key.startsWith('profiles.')) { setKey(config, key, v); sources[key] = source; } } };
   merge(defaults, 'default'); merge(user, paths.configFile);
@@ -36,7 +40,8 @@ export async function loadConfig({ cwd = process.cwd(), profile, cli = {}, env =
   }
   const trust = await readJson<Record<string, string>>(join(paths.config, 'trust.json'), {});
   const trusted = trust[root] === digest(project);
-  for (const [key, v] of Object.entries(flatten(project))) {
+  // Preserve trust for existing files by hashing their original keys.
+  for (const [key, v] of Object.entries(flatten(normalizeConfig(project)))) {
     if (safeProject(key) || trusted && trustedProject(key)) merge({ [key]: v }, `project:${root}`);
     else warnings.push(`忽略项目配置 ${key}${trustedProject(key) ? '（需要 config trust .）' : '（仅允许用户配置）'}`);
   }
@@ -46,14 +51,14 @@ export async function loadConfig({ cwd = process.cwd(), profile, cli = {}, env =
   };
   for (const [name, key] of Object.entries(overrides)) if (env[name]) merge({ [key]: name === 'TERMINAL_AGENT_UI' && env[name] === 'tui' ? 'opentui' : env[name] }, `env:${name}`);
   if ('NO_COLOR' in env || env.TERM === 'dumb') merge({ 'ui.color': 'never' }, 'terminal');
-  merge(cli, 'cli'); validateConfig(config);
+  merge(normalizeConfig(structuredClone(cli)), 'cli'); validateConfig(config);
   config.profiles = user.profiles ?? {};
   return { config, sources, warnings, root, paths, trusted };
 }
 export async function saveConfig(value: ConfigPatch, { project = false, cwd = process.cwd(), env = process.env } = {}) {
-  validateConfig(value);
+  value = normalizeConfig(structuredClone(value)) as ConfigPatch;
   if (project) for (const key of Object.keys(flatten(value))) if (!safeProject(key) && !trustedProject(key) && key !== 'schema_version') throw invalid(`项目配置不允许 ${key}`);
   const path = project ? join(await projectRoot(cwd), '.terminal-agent.toml') : productPaths(env).configFile;
   try { await copyFile(path, `${path}.bak`); } catch (e) { if (e.code !== 'ENOENT') throw e; }
-  await atomicWrite(path, stringify({ schema_version: 1, ...value })); return path;
+  await atomicWrite(path, project ? stringify({ schema_version: 1, ...value }) : userConfigTemplate(value)); return path;
 }

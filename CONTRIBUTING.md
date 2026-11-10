@@ -1,6 +1,6 @@
 # 参与开发
 
-Sayrun 处于早期迭代阶段。目前内置 DSH 后端，自然语言输入集成支持 zsh。本文是贡献代码的起点；完整资料见[文档索引](docs/README.md)，模块职责见[架构文档](docs/development/architecture.md)，外部后端协议见[接口参考](docs/reference/backend-protocol.md)。
+Sayrun 处于早期迭代阶段。内置 DSH 和 Codex 后端，自然语言输入集成支持 zsh。本文是贡献代码的起点；完整资料见[文档索引](docs/README.md)，模块职责见[架构文档](docs/development/architecture.md)，外部后端协议见[接口参考](docs/reference/backend-protocol.md)。
 
 ## 本地环境
 

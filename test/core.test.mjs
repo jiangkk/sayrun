@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { normalizeCommand, runCommand } from '../src/execution/process-runner.ts';
-import { LineRpc } from '../src/backends/dsh/rpc.ts';
+import { LineRpc } from '../src/backends/line-rpc.ts';
 import { prepareDsh, projectRoot } from '../src/backends/dsh/composition.ts';
 import { safeText } from '../src/terminal/display.ts';
 import { parseClassification } from '../src/backends/classification.ts';

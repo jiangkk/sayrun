@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { redactDiagnostics } from '../../terminal/display.ts';
-import { LineRpc } from './rpc.ts';
+import { LineRpc } from '../line-rpc.ts';
 import { packageRoot, dshBridge, runtimeHome as defaultRuntimeHome, credentialsPath as defaultCredentialsPath } from '../../platform/paths.ts';
 
 export const projectRoot = packageRoot;

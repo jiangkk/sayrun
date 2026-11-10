@@ -1,10 +1,22 @@
 import type { Config } from '../../contracts/config.ts';
 import { access } from 'node:fs/promises';
-import { credentialsPath } from '../../platform/paths.ts';
+import { join } from 'node:path';
+import { codexHome, credentialsPath } from '../../platform/paths.ts';
 import { invalid } from '../../errors.ts';
 
-export async function authStatus(config: Config, backend = config.agent.backend) {
+export function codexLogin(binary = 'codex') {
+  const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
+  const home = quote(codexHome());
+  return `mkdir -p -m 700 -- ${home} && CODEX_HOME=${home} ${quote(binary)} -c cli_auth_credentials_store=file login`;
+}
+
+export async function authStatus(config: Config, backend = config.agent.engine) {
   const settings = config.backends[backend]; if (!settings) throw invalid(`未知后端：${backend}`);
+  if (backend === 'codex') {
+    const path = join(codexHome(), 'auth.json');
+    try { await access(path); return { backend, status: 'file-present-unverified', source: path }; }
+    catch { return { backend, status: 'missing', source: '未找到 Codex 专用目录的登录文件。运行 sayrun auth login codex 查看登录命令。' }; }
+  }
   if (backend !== 'dsh') return { backend, status: 'adapter-managed', source: '请按适配器说明认证；不读取桌面 App 内部凭证' };
   const name = settings.api_key_env ?? 'DEEPSEEK_API_KEY';
   if (process.env[name]) return { backend, status: 'configured-unverified', source: `env:${name}` };

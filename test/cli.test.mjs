@@ -15,7 +15,7 @@ test('CLI exposes interactive, explicit task, shorthand, and local management en
   assert.equal(parseArguments(['shell', 'init', 'zsh']).mode, 'shell');
   assert.equal(parseArguments(['--version']).mode, 'version');
   assert.equal(parseArguments(['doctor', '--live']).mode, 'doctor');
-  for (const args of [['ask'], ['--'], ['doctro'], ['--unknown'], ['shell', 'init', 'bash'], ['preview', 'extra']]) {
+  for (const args of [['ask'], ['--'], ['doctro'], ['backend', 'list'], ['--unknown'], ['shell', 'init', 'bash'], ['preview', 'extra']]) {
     assert.throws(() => parseArguments(args));
   }
 });

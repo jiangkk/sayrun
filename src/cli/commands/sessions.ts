@@ -18,10 +18,10 @@ import { displayValue, markdownReport, notice, presentation, report, sessionLine
 
 export async function sessionsCommand(argv: string[]) {
   const action = argv[0] ?? 'browse', tail = argv.slice(1);
-  const specs: Record<string, OptionSpec> = { browse: {}, list: { flags: ['all', 'json', 'include-classifier', 'archived'], values: ['backend', 'status'] }, search: { flags: ['all', 'json', 'include-classifier', 'archived'], values: ['backend', 'status'] }, show: { flags: ['full', 'json'] }, export: { flags: ['json', 'full', 'redact', 'preview'], values: ['format', 'output'] }, rename: {}, pin: {}, unpin: {}, archive: {}, restore: {}, delete: { flags: ['yes', 'json'] }, gc: { flags: ['dry-run', 'apply', 'json'], values: ['days', 'max-total-mb'] }, reindex: { flags: ['json'] }, import: { flags: ['json'] }, fork: { flags: ['json'], values: ['backend', 'context'] } };
+  const specs: Record<string, OptionSpec> = { browse: {}, list: { flags: ['all', 'json', 'include-classifier', 'archived'], values: ['engine', 'status'] }, search: { flags: ['all', 'json', 'include-classifier', 'archived'], values: ['engine', 'status'] }, show: { flags: ['full', 'json'] }, export: { flags: ['json', 'full', 'redact', 'preview'], values: ['format', 'output'] }, rename: {}, pin: {}, unpin: {}, archive: {}, restore: {}, delete: { flags: ['yes', 'json'] }, gc: { flags: ['dry-run', 'apply', 'json'], values: ['days', 'max-total-mb'] }, reindex: { flags: ['json'] }, import: { flags: ['json'] }, fork: { flags: ['json'], values: ['engine', 'context'] } };
   if (!specs[action]) throw invalid(`未知历史命令：${action}`);
   const { opts, args } = options(tail, specs[action]), loaded = await loadConfig(), store = new SessionStore();
-  const listing = { all: opts.all ?? loaded.config.history.default_scope === 'all', includeClassifier: opts['include-classifier'] ?? loaded.config.history.include_classifier, archived: opts.archived, backend: opts.backend, status: opts.status };
+  const listing = { all: opts.all ?? loaded.config.history.default_scope === 'all', includeClassifier: opts['include-classifier'] ?? loaded.config.history.include_classifier, archived: opts.archived, backend: opts.engine, status: opts.status };
   if (['browse', 'list', 'search'].includes(action)) {
     arity(args, action === 'search' ? 1 : 0); const rows = action === 'search' ? await store.search(args[0], listing) : await store.list(listing);
     if (action === 'browse' && process.stdin.isTTY && process.stdout.isTTY) {
@@ -63,10 +63,10 @@ export async function sessionsCommand(argv: string[]) {
   }
   if (action === 'delete') { if (opts.yes || await confirm(`删除 ${meta.sessionId}（只删除本工具历史，后端原生数据保留）？`)) print(await store.delete(meta.sessionId), opts.json, '会话已删除'); return 0; }
   if (action === 'fork') {
-    if (!opts.backend || opts.context && opts.context !== 'summary') throw invalid('用法：sessions fork <id> --backend <name> --context summary');
-    const config = structuredClone(loaded.config); config.agent.backend = opts.backend; admitBackend(await createBackend(config).probe());
+    if (!opts.engine || opts.context && opts.context !== 'summary') throw invalid('用法：sessions fork <id> --engine <name> --context summary');
+    const config = structuredClone(loaded.config); config.agent.engine = opts.engine; admitBackend(await createBackend(config).probe());
     const context = visibleContext(await store.read(meta.sessionId));
-    const fork = await store.create({ prompt: meta.title, cwd: meta.cwd, backend: opts.backend, model: config.backends[opts.backend]?.model, config, parentSessionId: meta.sessionId });
+    const fork = await store.create({ prompt: meta.title, cwd: meta.cwd, backend: opts.engine, model: config.backends[opts.engine]?.model, config, parentSessionId: meta.sessionId });
     const writer = await store.begin(fork, { prompt: '显式创建可见上下文分支；尚未调用模型', config }); await writer.append('context.imported', context); await writer.finish('ready');
     print({ ...fork, note: '新分支已创建；resume 后输入新请求才调用模型', context: { included: context.included, total: context.total, bytes: context.bytes } }, opts.json, '会话分支已创建'); return 0;
   }

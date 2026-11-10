@@ -2,7 +2,7 @@ import { invalid } from '../errors.ts';
 
 export interface OptionSpec { values?: readonly string[]; flags?: readonly string[] }
 export type CliOptions = Partial<
-  Record<'zshrc' | 'backend' | 'profile' | 'model' | 'from' | 'manifest' | 'prompt' | 'format' | 'output' | 'days' | 'max-total-mb' | 'context' | 'status' | 'approval-mode', string> &
+  Record<'zshrc' | 'engine' | 'profile' | 'model' | 'from' | 'manifest' | 'prompt' | 'format' | 'output' | 'days' | 'max-total-mb' | 'context' | 'status' | 'approval-mode', string> &
   Record<'yes' | 'dry-run' | 'temporary' | 'no-shell' | 'live' | 'json' | 'check' | 'effective' | 'project' | 'all' | 'include-classifier' | 'archived' | 'full' | 'redact' | 'preview' | 'apply' | 'last' | 'context-only' | 'no-color' | 'ephemeral' | 'new', boolean>
 >;
 export function options(argv: string[], { values = [], flags = [] }: OptionSpec = {}): { opts: CliOptions; args: string[] } {
@@ -11,7 +11,8 @@ export function options(argv: string[], { values = [], flags = [] }: OptionSpec 
     const arg = argv[i];
     if (arg === '--') { args.push(...argv.slice(i + 1)); break; }
     if (!arg.startsWith('-')) { args.push(arg); continue; }
-    const key = arg.slice(2);
+    const name = arg.slice(2);
+    const key = name === 'backend' && values.includes('engine') ? 'engine' : name;
     if (!arg.startsWith('--') || !values.includes(key) && !flags.includes(key)) throw invalid(`未知选项：${arg}`);
     if (key in opts) throw invalid(`选项重复：${arg}`);
     if (flags.includes(key)) opts[key] = true;

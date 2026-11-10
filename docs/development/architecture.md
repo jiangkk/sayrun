@@ -14,7 +14,9 @@ bin/
 src/
   application/                    # 任务与分类编排、活动预算
   backends/
-    dsh/                          # DSH adapter、composition、RPC、插件
+    codex/                        # Codex App Server adapter
+    dsh/                          # DSH adapter、composition、插件
+    line-rpc.ts                   # 逐行 JSON-RPC
     process/                      # 外部进程后端
     classification.ts             # 分类响应解析
     protocol.ts                   # 能力准入、事件队列、工具定义
@@ -81,7 +83,6 @@ test/
 | `src/cli/main.ts` | 顶层命令解析、任务 / 恢复入口、Bun UI 重新启动、错误与退出码映射。 |
 | `src/cli/manage.ts` | 管理命令分派；处理安装、shell、认证入口、版本、更新、profile、迁移等简单分支。 |
 | `src/cli/commands/config.ts` | 查看 / 设置 / 编辑 / 校验配置及项目信任。 |
-| `src/cli/commands/backend.ts` | 后端列举、检查、注册、切换和移除。 |
 | `src/cli/commands/sessions.ts` | 历史选择器、查询、导入导出、分支、GC 和索引命令。 |
 | `src/cli/commands/auth.ts` | 查询后端认证来源与本地配置状态，不读取或打印密钥内容。 |
 | `src/cli/commands/doctor.ts` | 检查 shell、后端、UI、存储、认证与平台；显式 live 时才发送模型探测。 |
@@ -96,13 +97,14 @@ test/
 
 | 文件 | 内容与职责 |
 | --- | --- |
-| `src/backends/registry.ts` | 根据配置创建 DSH 或外部进程后端。 |
+| `src/backends/registry.ts` | 根据配置创建 DSH、Codex 或外部进程后端。 |
 | `src/backends/protocol.ts` | 能力准入、协议版本、异步事件队列、事件元数据与宿主工具定义。 |
 | `src/backends/classification.ts` | 校验分类响应的路由和置信度；不依赖应用层或具体后端。 |
 | `src/backends/dsh/backend.ts` | DSH 兼容性探测、session、socket 服务、请求回复关联、统一事件转换与关闭。 |
 | `src/backends/dsh/classifier.ts` | 无工具 DSH 分类会话；限制时间和步数，拒绝工具调用等越界行为。 |
 | `src/backends/dsh/composition.ts` | persona、composition patch、凭证路径引用、进程启动及诊断。 |
-| `src/backends/dsh/rpc.ts` | DSH 逐行 JSON-RPC 的请求关联、通知、超时与连接清理。 |
+| `src/backends/line-rpc.ts` | DSH 和 Codex 共用的逐行 JSON-RPC，包括请求关联、通知、超时与连接清理。 |
+| `src/backends/codex/` | App Server 协议探测、执行环境与工具限制、动态工具映射、原生线程与关闭。 |
 | `src/backends/dsh/terminal-tool.ts` | 独立构建的 DSH 插件，注册命令 / 问题工具，通过带令牌的 Unix socket 交回宿主。 |
 | `src/backends/process/backend.ts` | manifest、环境白名单、外部后端握手、消息关联、事件流和子进程回收。 |
 | `src/execution/local-zsh.ts` | Executor 的本地实现，绑定 targetId、shell、超时和输出限制。 |
@@ -115,6 +117,7 @@ test/
 | `src/config/approval.ts` | 三种授权模式定义、参数校验和 sudo 文本识别；项目配置不得覆盖。 |
 | `src/execution/sudo-session.ts` | 直接调用系统 sudo 验证及刷新凭据，取消与退出时清理刷新进程。 |
 | `src/config/defaults.ts` | 完整有效配置的默认值。 |
+| `src/config/template.ts` | 从默认值和已保存用户值生成完整 TOML，附中文字段说明及未启用的可选项示例。 |
 | `src/config/schema.ts` | 字段 / 类型 / 枚举 / profile 校验，配置路径读取、更新与 flatten。 |
 | `src/config/load.ts` | TOML 读写、用户 / profile / 项目 / 环境 / CLI 合并、来源记录、摘要信任和保存备份。 |
 | `src/history/store.ts` | 安装身份、会话元数据、文件锁、事件读取、查询、导入、GC 和 SQLite 索引重建。 |
@@ -165,7 +168,7 @@ test/
 | `package.json` / `package-lock.json` | 命令、发布白名单、CLI、平台、依赖与版本锁定。 |
 | `tsconfig.json` | 检查 src、bin、scripts；strict、ESM、type-only import 和未使用声明检查，不生成 JS。 |
 | `test/core.test.mjs` | 命令执行 / 校验、取消、输出上限、RPC、composition、shell 路由与预算。 |
-| `test/product.test.mjs` | 配置、信任、安装、历史 / 锁 / GC、协调器顺序、外部插件和恢复。 |
+| `test/product.test.mjs` | 配置默认值补齐与编辑修复、信任、安装、历史 / 锁 / GC、协调器顺序、外部插件和恢复。 |
 | `test/cli.test.mjs` | CLI 解析、路径、非 TTY 行为和 zsh 接入。 |
 | `test/transcript.test.mjs` | Markdown、换行、控制字符清理和输出摘要。 |
 | `test/build.test.mjs` | 独立 JS 入口、构建资产、插件 exports 和生成的 shell 集成。 |
@@ -188,7 +191,7 @@ test/
 ## 依赖约束
 
 - CLI 处理参数、交互入口、展示和退出码；任务协调位于 application。后端、执行器与 UI 使用 contracts 中的接口交互。
-- DSH 的原始协议与 composition 留在 `backends/dsh/`。分类响应解析放在后端共享模块，避免 DSH 依赖应用层。
+- DSH 的原始协议与 composition 留在 `backends/dsh/`，Codex 的 App Server 方法与数据结构留在 `backends/codex/`。分类响应解析放在后端共享模块，避免 DSH 依赖应用层。
 - 项目定位是 platform 能力，配置与历史直接复用，不再从配置模块借用项目定位。
 - CLI 输入独立于 main，历史选择器直接引用 input，不再反向导入 CLI 主流程。
 - `RunWriter` 只用 type-only import 引用 SessionStore，存储与写入器没有相互初始化的运行时依赖。
@@ -203,7 +206,7 @@ test/
 1. 将 cli/main 中的恢复流程提取成独立应用用例，把具体依赖的创建集中到组合入口。
 2. store 的锁、GC、索引继续增长时再独立；应用层可以只依赖开始 / 追加 / 保存结果 / 结束的小型历史接口。
 3. UI 编辑与问答状态继续增长时再拆分组件；不为增加文件数而拆分。
-4. 增加第二个真实后端前，统一后端契约测试，进一步完善外部 JSON 与历史事件的版本化解析。
+4. 进一步完善共享契约测试及外部 JSON 与历史事件的版本化解析。
 5. 测试按领域归档，并维护随代码版本更新的设计文档。
 
 ## 构建与运行时

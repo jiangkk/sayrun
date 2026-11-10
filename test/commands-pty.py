@@ -7,6 +7,7 @@ import pty
 import re
 import select
 import signal
+import shutil
 import struct
 import subprocess
 import tempfile
@@ -75,7 +76,7 @@ class Terminal:
 with tempfile.TemporaryDirectory(prefix='sayrun-ui-', dir='/tmp') as directory:
     temp = Path(directory)
     env = dict(os.environ, TERM='xterm-256color', TA_HOME=str(temp / 'product'), ZDOTDIR=str(temp),
-               TERMINAL_AGENT_UI='opentui', TERMINAL_AGENT_DSH_BIN=str(ROOT / 'test/fixture-dsh.mjs'))
+               TERMINAL_AGENT_UI='opentui', DEEPSEEK_API_KEY='offline-fixture-key', TERMINAL_AGENT_DSH_BIN=str(ROOT / 'test/fixture-dsh.mjs'))
     env.pop('TERMINAL_AGENT_HOME', None)
     zshrc = temp / '.zshrc'
     zshrc.write_text('# preserve my shell\n')
@@ -94,25 +95,25 @@ with tempfile.TemporaryDirectory(prefix='sayrun-ui-', dir='/tmp') as directory:
         finally:
             terminal.close()
 
-    preview = run(['setup', '--dry-run'])
+    preview = run(['setup', '--engine', 'dsh', '--dry-run'])
     assert '███████' in preview and '安装预览' in preview and '预览模式' in preview
     assert not (temp / 'product').exists()
     assert zshrc.read_text() == '# preserve my shell\n'
-    run(['setup', '--no-shell'], '应用以上配置？', '\r', 130)
-    run(['setup', '--no-shell'], '应用以上配置？', '\x03', 130)
+    run(['setup', '--engine', 'dsh', '--no-shell'], '应用以上配置？', '\r', 130)
+    run(['setup', '--engine', 'dsh', '--no-shell'], '应用以上配置？', '\x03', 130)
     assert not (temp / 'product').exists()
-    applied = run(['setup', '--no-shell'], '应用以上配置？', 'y')
+    applied = run(['setup', '--engine', 'dsh', '--no-shell'], '应用以上配置？', 'y')
     assert '环境检查通过' in applied and 'Sayrun 已就绪' in applied
     assert '"diagnostics"' not in applied and '"available"' not in applied
     assert '# >>> sayrun >>>' in zshrc.read_text()
     assert list(temp.glob('.zshrc.sayrun.*.bak'))
     print('PASS: setup logo, dry-run, default cancellation, Ctrl-C, apply, and backup', flush=True)
-    run(['setup', '--no-shell'], '应用以上配置？', 'y', choice='\x1b[B\r')
+    run(['setup', '--engine', 'dsh', '--no-shell'], '应用以上配置？', 'y', choice='\x1b[B\r')
     assert json.loads(run(['config', 'get', 'approval.mode', '--json']))['value'] == 'normal'
     run(['config', 'set', 'approval.mode', 'ask'])
     print('PASS: setup selects normal authorization and config can restore ask', flush=True)
 
-    for args, expected in [(['doctor'], '环境检查通过'), (['backend', 'list'], '已注册后端'),
+    for args, expected in [(['doctor', '--engine', 'dsh'], '环境检查通过'),
                            (['auth', 'status'], '认证状态'), (['config', 'show', '--effective'], '配置总览'),
                            (['sessions'], '没有匹配的会话'), (['--help'], '命令指南'), (['version'], '版本信息')]:
         text = run(args, width=44)
@@ -145,3 +146,42 @@ with tempfile.TemporaryDirectory(prefix='sayrun-ui-', dir='/tmp') as directory:
     assert session['title'] in text and 'FINAL_ANSWER_END' in text, text
     run(['resume', session['sessionId']], '继续请求', '\r')
     print('PASS: task input hands off to approval; history selection and resume return cleanly', flush=True)
+
+with tempfile.TemporaryDirectory(prefix='sayrun-setup-agent-', dir='/tmp') as directory:
+    temp = Path(directory)
+    zshrc = temp / '.zshrc'
+    zshrc.write_text('# preserve my shell\n')
+    binary = temp / 'dsh'
+    env = dict(os.environ, TERM='xterm-256color', TA_HOME=str(temp / 'product'), ZDOTDIR=str(temp),
+               TERMINAL_AGENT_UI='opentui', TERMINAL_AGENT_DSH_BIN=str(binary))
+    terminal = Terminal(['setup', '--engine', 'dsh', '--approval-mode', 'ask', '--no-shell'], env, temp)
+    try:
+        terminal.until('未找到可用的 Agent')
+        terminal.until('安装 Agent 后重新检测')
+        assert not (temp / 'product').exists()
+        assert zshrc.read_text() == '# preserve my shell\n'
+        binary.symlink_to(ROOT / 'test/fixture-dsh.mjs')
+        terminal.send('\r')
+        terminal.until('应用以上配置？')
+        terminal.send('y')
+        terminal.exited()
+        assert '# >>> sayrun >>>' in zshrc.read_text()
+    finally:
+        terminal.close()
+
+    codex = temp / 'codex'
+    shutil.copyfile(ROOT / 'test/fixture-codex.mjs', codex)
+    codex.chmod(0o700)
+    config = temp / 'product/config/config.toml'
+    config.write_text(f'[agent]\nbackend="dsh"\n[backends.codex]\nbinary="{codex}"\n')
+    terminal = Terminal(['setup', '--approval-mode', 'ask', '--no-shell'], env, temp)
+    try:
+        terminal.until('选择默认 Agent')
+        terminal.send('\x1b[B\r')
+        terminal.until('应用以上配置？')
+        terminal.send('y')
+        terminal.exited()
+        assert 'engine = "codex"' in config.read_text()
+    finally:
+        terminal.close()
+    print('PASS: setup offers installation and retries detection, then supports choosing either installed Agent', flush=True)

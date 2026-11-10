@@ -12,7 +12,7 @@ import { manage } from './manage.ts';
 import { version } from './version.ts';
 import { commandHelp } from './help.ts';
 import { loadConfig } from '../config/load.ts';
-import { validateConfig } from '../config/schema.ts';
+import { normalizeConfig } from '../config/schema.ts';
 import { SessionStore } from '../history/store.ts';
 import { exportMarkdown } from '../history/export.ts';
 import { visibleContext } from '../history/context.ts';
@@ -21,7 +21,7 @@ import { admitBackend } from '../backends/protocol.ts';
 import { AgentError, invalid } from '../errors.ts';
 import { closePresentation, markdownReport, notice, report, setPresentation } from './presentation.ts';
 
-const management = ['setup', 'doctor', 'backend', 'auth', 'config', 'profile', 'sessions', 'resume', 'migrate', 'update', 'route-mode'];
+const management = ['setup', 'doctor', 'auth', 'config', 'profile', 'sessions', 'resume', 'migrate', 'update', 'route-mode'];
 export function parseArguments(argv: string[]) {
   const [mode, ...args] = argv;
   if (!mode) return { mode: 'interactive', args: [] };
@@ -50,19 +50,19 @@ async function launchUi(argv: string[]): Promise<number> {
   finally { process.removeListener('SIGINT', ignore); process.removeListener('SIGTERM', terminate); }
 }
 function taskOptions(args: string[], force = false) {
-  const parsed = force ? { opts: {}, args } : options(args, { values: ['backend', 'profile', 'model'], flags: ['no-color', 'ephemeral', 'new'] });
+  const parsed = force ? { opts: {}, args } : options(args, { values: ['engine', 'profile', 'model'], flags: ['no-color', 'ephemeral', 'new'] });
   if (!parsed.args.join(' ').trim()) throw invalid('请输入任务'); return parsed;
 }
 async function effectiveTask(opts: CliOptions) {
   const cli: ConfigPatch = {};
-  if (opts.backend) cli.agent = { backend: opts.backend };
+  if (opts.engine) cli.agent = { engine: opts.engine };
   if (opts['no-color']) cli.ui = { color: 'never' };
   let loaded = await loadConfig({ profile: opts.profile, cli });
-  if (opts.model) { const backend = loaded.config.agent.backend; cli.backends = { [backend]: { model: opts.model } }; loaded = await loadConfig({ profile: opts.profile, cli }); }
+  if (opts.model) { const backend = loaded.config.agent.engine; cli.backends = { [backend]: { model: opts.model } }; loaded = await loadConfig({ profile: opts.profile, cli }); }
   return loaded;
 }
 async function resume(args: string[], originalArgv: string[]) {
-  const { opts, args: ids } = options(args, { values: ['prompt', 'profile', 'backend', 'model'], flags: ['last', 'context-only', 'no-color'] });
+  const { opts, args: ids } = options(args, { values: ['prompt', 'profile', 'engine', 'model'], flags: ['last', 'context-only', 'no-color'] });
   if (ids.length > 1 || opts.last && ids.length || !opts.last && ids.length !== 1) throw invalid('用法：resume <id> | --last [--prompt "继续请求"]');
   const loaded = await effectiveTask(opts);
   if (loaded.config.ui.mode !== 'plain' && !process.versions.bun && process.stdin.isTTY && process.stdout.isTTY) return launchUi(originalArgv);
@@ -73,9 +73,9 @@ async function resume(args: string[], originalArgv: string[]) {
   if (await store.active(meta.sessionId)) throw new AgentError('session_locked', '会话正在运行，请结束后再恢复');
   if (meta.machineId !== store.machineId) throw invalid('此会话来自另一台机器；请先显式 fork 到本机');
   const data = await store.read(meta.sessionId);
-  if (opts.backend && opts.backend !== meta.backend) throw invalid('更换后端请使用 sessions fork，不会静默发送到其他服务');
+  if (opts.engine && opts.engine !== meta.backend) throw invalid('更换后端请使用 sessions fork，不会静默发送到其他服务');
   const config = structuredClone(meta.config ?? loaded.config);
-  config.agent.backend = meta.backend; config.backends ??= {}; config.backends[meta.backend] ??= {};
+  config.agent.engine = meta.backend; config.backends ??= {}; config.backends[meta.backend] ??= {};
   // Executables and credential references always come from current user config.
   const model = opts.model ?? meta.model ?? config.backends[meta.backend]?.model;
   config.backends[meta.backend] = { ...loaded.config.backends[meta.backend], ...(model ? { model } : {}) };
@@ -83,7 +83,7 @@ async function resume(args: string[], originalArgv: string[]) {
   for (const key of ['timeout_seconds', 'max_output_bytes'] as const) config.execution[key] = Math.min(config.execution[key], loaded.config.execution[key]);
   config.execution.shell = loaded.config.execution.shell; config.execution.executor = loaded.config.execution.executor;
   config.history = loaded.config.history; config.ui = loaded.config.ui; config.approval = loaded.config.approval;
-  validateConfig(config);
+  normalizeConfig(config);
   const cwd = await realpath(meta.cwd).catch(() => { throw invalid(`旧任务目录不存在：${meta.cwd}。请先恢复该目录或显式创建新任务`); });
   if (!(await stat(cwd)).isDirectory()) throw invalid('旧任务目录不可用');
   const backend = createBackend(config), probe = await backend.probe(); admitBackend(probe);
@@ -139,7 +139,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (loaded.config.ui.mode !== 'plain' && !process.versions.bun) return await launchUi(argv);
     await closePresentation();
     for (const warning of loaded.warnings) process.stderr.write(warning + '\n');
-    if (!loaded.config.history.enabled && !parsed.opts.ephemeral) write('本工具历史已关闭；DSH 仍可能保存原生会话。\n');
+    if (!loaded.config.history.enabled && !parsed.opts.ephemeral) write('Sayrun 历史已关闭；所选后端仍可能保存原生会话。\n');
     return (await runAgent(parsed.args.join(' '), { config: loaded.config, ephemeral: parsed.opts.ephemeral, newSession: parsed.opts.new })).exitCode;
   } catch (error) { notice(`${error.code ? `${error.code}：` : ''}${error.message}`, 'red'); return error.exitCode ?? 1; }
   finally { await closePresentation(); }

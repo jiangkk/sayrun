@@ -4,13 +4,13 @@
 
 ### 为终端工作流而生的即时 AI 助手
 
-为用着 DSH、也习惯亲手敲命令的你，把 AI 帮助接进日常终端工作流。
+把 DSH 或 Codex 接进日常终端工作流，继续在熟悉的 zsh 里操作。
 
 **命令照常敲，AI 随时问。**
 
-Sayrun (`sayrun-shell`) is an AI terminal assistant for zsh, powered by your installed DeepSeek Harness (DSH). Ask in natural language, choose how commands are authorized, and continue your existing shell workflow.
+Sayrun (`sayrun-shell`) is an AI terminal assistant for zsh, powered by your installed DeepSeek Harness (DSH) or Codex CLI. Ask in natural language, choose how commands are authorized, and continue your existing shell workflow.
 
-当前支持 zsh 集成 · 复用已认证的 DSH
+当前支持 zsh 集成 · 内置 DSH 与 Codex 后端
 
 [安装使用](#安装使用) · [快速开始](#快速开始) · [功能特性](#功能特性) · [常见问题](#常见问题) · [文档索引](docs/README.md)
 
@@ -20,7 +20,7 @@ Sayrun (`sayrun-shell`) is an AI terminal assistant for zsh, powered by your ins
 
 普通命令、别名、函数和多行输入照常交给 zsh。你可以自己敲命令，也可以随手用自然语言求助，在同一个终端里交替进行。
 
-Sayrun 将你已有的 DSH 能力接入日常 shell 操作。当前内置 DSH 后端，复用已配置的认证，无需重复配置 API Key。
+Sayrun 将 DSH 或 Codex 接入日常 shell 操作。默认使用 DSH，并复用其已有认证。
 
 当前为 0.1.x 早期版本，已在 macOS / Apple Silicon 验证。欢迎试用和反馈；平台、后端及执行边界见下文和 [安全说明](SECURITY.md)。
 
@@ -41,7 +41,8 @@ Sayrun 将你已有的 DSH 能力接入日常 shell 操作。当前内置 DSH �
 | 系统 | 已在 macOS / Apple Silicon 验证；Linux 和其他架构待验证 |
 | 终端 | 交互式终端；当前自然语言输入集成仅支持 zsh |
 | Node.js | 22 或更高版本 |
-| DSH | 已安装、完成认证且位于 `PATH`；使用 `sdk-minimal`，不限制版本号 |
+| DSH（默认） | 已安装、完成认证且位于 `PATH`；使用 `sdk-minimal`，不限制版本号 |
+| Codex（可选） | 已安装兼容的 Codex CLI，并在 Sayrun 专用目录完成认证 |
 
 **Windows 用户请注意：当前不支持 Windows 原生环境（PowerShell、CMD 等）。WSL 尚未验证，后续考虑支持。**
 
@@ -56,7 +57,9 @@ npm install -g @deepseek-ai/dsh
 dsh --version
 ```
 
-DSH 仍在快速迭代。Sayrun 不按版本号拦截，实际运行需要 `sdk-minimal`、JSON-RPC 和桥接插件接口兼容；可用 `sayrun backend check dsh` 检查本地启动情况。认证设置见 [官方模型配置文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.md)。
+DSH 仍在快速迭代。Sayrun 不按版本号拦截，实际运行需要 `sdk-minimal`、JSON-RPC 和桥接插件接口兼容；可用 `sayrun doctor --engine dsh` 检查本地启动情况。认证设置见 [官方模型配置文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.md)。
+
+使用 Codex 时，先运行 `sayrun doctor --engine codex`，再按 `sayrun auth login codex` 显示的命令完成专用目录的认证。用 `sayrun ask --engine codex "帮我检查当前目录"` 试用，或用 `sayrun config set agent.engine codex` 设为默认。详见[使用 Codex](docs/guide/usage.md#使用-codex)。
 
 ### 安装到本机
 
@@ -76,7 +79,7 @@ Sayrun 复用 DSH 已配置的凭证，无需重复配置 API Key。安装完成
 sayrun setup
 ```
 
-`setup` 先选择授权模式，默认一律询问，再使用 OpenTUI 展示 Sayrun 字标、安装预览和确认选项，经确认后备份 zsh 配置文件，并写入终端集成。首次在交互式终端运行时，会自动进入已启用 Sayrun 的新 zsh，随后即可直接输入自然语言；`exit` 返回原终端。已经加载集成的终端运行 `setup` 会直接刷新当前集成。
+`setup` 先检测本机的 DSH 和 Codex。两个都可用时可以选择，找不到时会显示安装指引，可安装后重新检测。选定 Agent 后再选择授权模式，默认一律询问，再使用 OpenTUI 展示 Sayrun 字标、安装预览和确认选项，经确认后备份 zsh 配置文件，并写入终端集成。首次在交互式终端运行时，会自动进入已启用 Sayrun 的新 zsh，随后即可直接输入自然语言；`exit` 返回原终端。已经加载集成的终端运行 `setup` 会直接刷新当前集成。
 
 脚本调用或使用 `--no-shell`、`--temporary`、`--zshrc` 时不会自动启动新 shell。也可以手动在当前交互式 zsh 中启用：
 
@@ -137,9 +140,9 @@ sayrun ask "帮我找出当前目录最大的十个文件，只读取文件信�
 | 终端交互界面 | OpenTUI 提供键盘选择、多行编辑、追问和滚动；也可切换纯文本模式 |
 | 执行反馈 | 展示输出摘要、退出状态和 Markdown 结论，支持取消与超时限制 |
 | 统一任务历史 | 按项目查看、搜索、重命名、固定、归档、导入和导出会话 |
-| 连续对话 | 同一 zsh 实例和项目复用 DSH 原生会话，上下文自动压缩由 DSH 管理 |
+| 连续对话 | 同一 zsh 实例和项目复用所选后端的原生会话 |
 | 分层配置 | 支持用户配置、项目配置和命名配置组合，可查看生效值及其来源 |
-| 后端扩展与诊断 | 内置 DSH，支持显式注册外部进程适配器，提供能力检查和环境诊断 |
+| 后端扩展与诊断 | 内置 DSH 和 Codex，支持显式注册外部进程适配器，提供能力检查和环境诊断 |
 
 ### 回看与继续任务
 
@@ -155,22 +158,24 @@ sayrun sessions export <会话ID> --format markdown --output /tmp/task.md
 
 启用 zsh 集成后，同一 shell 实例、项目和后端中的提问默认延续当前会话，每次提问记录为独立 run。普通命令（如 `ls`、`git status`）和重新加载集成不会切断对话；新终端或新启动的 zsh 使用独立会话。同一 Git 项目内切换子目录保留会话，切换项目会使用独立会话，切回来可继续。普通命令的输出不会自动发送给模型，环境变化需在下一轮重新检查。使用 `sayrun ask --new "任务"` 主动开始新对话。
 
-DSH 通过 `session/resume` 恢复原生历史，保留其上下文压缩结果；每轮结束正常关闭后端并保存历史。恢复失败会明确报错，不会静默丢失上下文；可显式使用 `--context-only` 将可见历史作为上下文创建新分支。旧命令不会自动重放，后续执行采用当前授权模式。关闭本工具历史时不自动续接会话；未加载 zsh 集成的独立调用仍默认新建，可用 `resume` 显式继续。
+DSH 和 Codex 均支持恢复原生历史；每轮结束正常关闭后端并保存历史。恢复失败会明确报错，不会静默丢失上下文；可显式使用 `--context-only` 将可见历史作为上下文创建新分支。旧命令不会自动重放，后续执行采用当前授权模式。关闭本工具历史时不自动续接会话；未加载 zsh 集成的独立调用仍默认新建，可用 `resume` 显式继续。
 
 ### 调整常用配置
 
 ```zsh
+sayrun config init                   # 补齐全部默认配置和说明，保留已有值
+sayrun config edit                   # 打开完整配置文件
 sayrun config show --effective       # 查看实际配置及来源
 sayrun config set ui.mode plain      # 所有命令使用纯文本界面
 sayrun config set ui.mode opentui    # 切回 OpenTUI
 sayrun config set agent.max_commands 20
 sayrun config set agent.max_steps 24
 sayrun config set execution.timeout_seconds 60
-sayrun backend list
-sayrun backend check dsh
+sayrun config get agent.engine
+sayrun doctor --engine dsh
 ```
 
-用户配置默认位于 `~/.config/terminal-agent/config.toml`，项目配置使用 `.terminal-agent.toml`；这些路径沿用旧版命名，以兼容已有配置和历史。涉及后端、模型、预算等字段时，需要先执行 `sayrun config trust .`。
+用户配置默认位于 `~/.config/terminal-agent/config.toml`。`setup`、`config init` 和保存用户配置时会补齐当前版本的全部默认字段，附上中文用途、可选值和单位，保留已有值，并备份原文件为 `.bak`。没有通用默认值的凭证路径、外部后端及 profile 用注释示例展示。`config init` 不修改 Shell 集成。项目配置使用 `.terminal-agent.toml`，只保存显式设置的字段；这些路径沿用旧版命名，以兼容已有配置和历史。项目中的后端、模型、预算等字段需要先执行 `sayrun config trust .`。
 
 默认每次任务最多 15 条命令、15 个模型步骤、5 次追问和 600 秒活动时间，等待人工输入时暂停计时；同一会话再次提问会重新计数。预算用完时先汇总进展、卡点和下一步；模型无法收尾时根据执行记录汇总。较长任务可调整预算。详见[执行与异常](docs/guide/usage.md#执行与异常)。
 
@@ -196,11 +201,11 @@ npm 安装提供命令行程序；直接输入自然语言需要 zsh 已加载�
 
 ### 需要哪些运行时？
 
-Node.js 运行命令行入口，npm 安装的 Bun 运行 OpenTUI 界面，DSH 提供模型后端。使用者运行构建后的 JavaScript；TypeScript 和 `tsx` 用于开发，Python 仅用于终端和安装回归测试。
+Node.js 运行命令行入口，npm 安装的 Bun 运行 OpenTUI 界面，DSH 和 Codex 提供模型后端。使用者运行构建后的 JavaScript；TypeScript 和 `tsx` 用于开发，Python 仅用于终端和安装回归测试。
 
 ### 如何排查环境或认证问题？
 
-先执行 `sayrun doctor`、`sayrun backend check dsh` 和 `sayrun auth status dsh`。默认检查不发送模型请求；需要在线验证时使用 `sayrun doctor --live`，可能产生模型用量。
+先执行 `sayrun doctor`、`sayrun doctor --engine dsh` 和 `sayrun auth status dsh`。默认检查不发送模型请求；需要在线验证时使用 `sayrun doctor --live`，可能产生模型用量。
 
 ### 如何卸载？
 

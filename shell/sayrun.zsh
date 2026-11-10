@@ -139,9 +139,8 @@ function sayrun() {
     done
     TERMINAL_AGENT_SETUP_WRAPPER=1 "$TERMINAL_AGENT_NODE" "$TERMINAL_AGENT_ROOT/dist/sayrun.js" "$@"
     setup_status=$?
-    # doctor may report unavailable credentials/backend after a successful setup.
-    # A declined setup returns 130 and must not re-enable a disabled integration.
-    if (( ! skip_reload && (setup_status == 0 || setup_status == 5) )); then
+    # A failed or declined setup must not re-enable a disabled integration.
+    if (( ! skip_reload && setup_status == 0 )); then
       source "$TERMINAL_AGENT_ROOT/dist/sayrun.zsh"
     fi
     return $setup_status

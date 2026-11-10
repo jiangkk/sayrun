@@ -10,9 +10,11 @@ export async function classifyInput(input: string, { cwd = process.cwd(), timeou
   try {
     config ??= (await loadConfig({ cwd })).config;
     if (signal?.aborted || config.routing.mode !== 'auto' || input.length > 8192) return 'ask';
-    const classifierConfig = config.routing.classifier === 'backend' ? config : { ...config, agent: { ...config.agent, backend: config.routing.classifier } };
-    const backend = createBackend(classifierConfig), probe = await backend.probe();
-    if (!probe.available || !probe.capabilities.classify || !backend.classify) return 'ask';
+    const classifierConfig = config.routing.classifier === 'backend' ? config : { ...config, agent: { ...config.agent, engine: config.routing.classifier } };
+    const backend = createBackend(classifierConfig);
+    if (!backend.classify) return 'ask';
+    const probe = await backend.probe();
+    if (!probe.available || !probe.capabilities.classify) return 'ask';
     if (config.history.enabled) {
       const store = new SessionStore();
       const meta = await store.create({ prompt: input, cwd, backend: backend.id, model: config.backends[backend.id]?.model, config, kind: 'classifier' });

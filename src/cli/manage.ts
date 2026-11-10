@@ -12,26 +12,30 @@ import { options, arity } from './args.ts';
 import { print } from './output.ts';
 import { version } from './version.ts';
 import { configCommand } from './commands/config.ts';
-import { backendCommand } from './commands/backend.ts';
 import { sessionsCommand } from './commands/sessions.ts';
-import { authStatus } from './commands/auth.ts';
+import { authStatus, codexLogin } from './commands/auth.ts';
+import { chooseSetupAgent } from './commands/setup-agent.ts';
 import { doctor } from './commands/doctor.ts';
 import { closePresentation, notice, report, status } from './presentation.ts';
 
 export async function manage(mode: string, argv: string[]) {
   if (mode === 'setup') {
-    const { opts, args } = options(argv, { values: ['zshrc', 'backend', 'approval-mode'], flags: ['yes', 'dry-run', 'temporary', 'no-shell'] }); arity(args, 0);
-    const result = await setup({ yes: opts.yes, dryRun: opts['dry-run'], zshrc: opts.zshrc, backend: opts.backend, temporary: opts.temporary, mode: opts['approval-mode'] });
+    const { opts, args } = options(argv, { values: ['zshrc', 'engine', 'approval-mode'], flags: ['yes', 'dry-run', 'temporary', 'no-shell'] }); arity(args, 0);
+    const interactive = !opts.yes && !opts['dry-run'] && !!process.stdin.isTTY && !!process.stdout.isTTY;
+    const agent = await chooseSetupAgent(opts.engine, interactive);
+    if ('exitCode' in agent) return agent.exitCode;
+    const result = await setup({ yes: opts.yes, dryRun: opts['dry-run'], zshrc: opts.zshrc, backend: agent.id, temporary: opts.temporary, mode: opts['approval-mode'] });
     if (!result.applied) return opts['dry-run'] ? 0 : 130;
     status('正在检查本地运行环境');
     const doctorStatus = await doctor();
-    report(doctorStatus === 0 ? 'Sayrun 已就绪' : '配置已保存 · 还有项目需要处理', [
-      { text: doctorStatus === 0 ? '现在就可以在终端输入自然语言任务。' : '安装已完成，请根据上方检查结果补全环境。', tone: doctorStatus === 0 ? 'green' : 'amber' },
-      { text: '试试看：sayrun ask "帮我检查当前目录"', tone: 'accent' },
-    ], { tone: doctorStatus === 0 ? 'green' : 'amber' });
+    const ready = doctorStatus === 0 && !agent.authMissing;
+    report(ready ? 'Sayrun 已就绪' : '配置已保存 · 还有项目需要处理', [
+      ready ? { text: '试试看：sayrun ask "帮我检查当前目录"', tone: 'accent' }
+        : { text: '请根据上方检查结果完成 Agent 配置。', tone: 'amber' },
+    ], { tone: ready ? 'green' : 'amber' });
     if (process.env.TERMINAL_AGENT_SETUP_WRAPPER === '1' && !opts['no-shell']) return doctorStatus;
-    if (process.stdin.isTTY && process.stdout.isTTY && !opts['no-shell'] && !opts.temporary && !opts.zshrc) {
-      notice('配置完成，正在进入已启用 Sayrun 的新 zsh；可直接输入自然语言。exit 返回原终端。', 'green');
+    if (doctorStatus === 0 && process.stdin.isTTY && process.stdout.isTTY && !opts['no-shell'] && !opts.temporary && !opts.zshrc) {
+      notice('正在进入已启用 Sayrun 的新 zsh。exit 返回原终端。', 'green');
       await closePresentation();
       const shell = spawnSync('zsh', ['-i'], { stdio: 'inherit' });
       if (shell.error) throw invalid(`无法启动 zsh：${shell.error.message}。请执行 eval "$(sayrun shell init zsh)"`);
@@ -40,7 +44,7 @@ export async function manage(mode: string, argv: string[]) {
     report('下一步', [{ text: opts.temporary ? '临时配置完成，未写入 zsh 启动文件。' : opts.zshrc ? '配置已写入指定的 zshrc。' : '配置完成，新开的 zsh 会自动加载集成。' }, { text: '当前终端立即启用：eval "$(sayrun shell init zsh)"', tone: 'accent' }]);
     return doctorStatus;
   }
-  if (mode === 'doctor') { const { opts, args } = options(argv, { flags: ['live', 'json'] }); arity(args, 0); return doctor({ live: opts.live, json: opts.json }); }
+  if (mode === 'doctor') { const { opts, args } = options(argv, { flags: ['live', 'json'], values: ['engine'] }); arity(args, 0); return doctor({ live: opts.live, json: opts.json, backendId: opts.engine }); }
   if (mode === 'shell') {
     const [action, ...tail] = argv;
     if (['on', 'off', 'status'].includes(action)) { arity(tail, 0); throw invalid('此操作需要已加载的父 shell wrapper：先 eval "$(sayrun shell init zsh)"；然后运行 sayrun shell ' + action); }
@@ -54,7 +58,7 @@ export async function manage(mode: string, argv: string[]) {
   if (mode === 'version') {
     const { opts, args } = options(argv, { flags: ['json'] }); arity(args, 0);
     const loaded = await loadConfig(); let backend; try { backend = await createBackend(loaded.config).probe(); } catch (e) { backend = { available: false, diagnostics: [e.message] }; }
-    print({ version, node: process.version, bun: JSON.parse(readFileSync(createRequire(import.meta.url).resolve('bun/package.json'), 'utf8')).version, opentui: '0.6.6', protocol: backendApiVersion, adapter: loaded.config.agent.backend, backend }, opts.json, '版本信息'); return 0;
+    print({ version, node: process.version, bun: JSON.parse(readFileSync(createRequire(import.meta.url).resolve('bun/package.json'), 'utf8')).version, opentui: '0.6.6', protocol: backendApiVersion, adapter: loaded.config.agent.engine, backend }, opts.json, '版本信息'); return 0;
   }
   if (mode === 'update') {
     const { opts, args } = options(argv, { flags: ['check', 'json'] }); arity(args, 0);
@@ -65,12 +69,11 @@ export async function manage(mode: string, argv: string[]) {
   }
   if (mode === 'config') return configCommand(argv);
   if (mode === 'profile') { const { opts, args } = options(argv, { flags: ['json'] }); if (args.join(' ') !== 'list') throw invalid('用法：profile list'); const { config } = await loadConfig(); print(config.profiles, opts.json, '配置预设'); return 0; }
-  if (mode === 'backend') return backendCommand(argv);
   if (mode === 'auth') {
     const { opts, args } = options(argv, { flags: ['json'] }); const [action, id] = args; arity(args, 1, 2);
     const { config } = await loadConfig();
     if (action === 'status') print(await authStatus(config, id), opts.json, '认证状态');
-    else if (action === 'login') { if (!id || !config.backends[id]) throw invalid('用法：auth login <已注册后端>'); print(id === 'dsh' ? `DSH 适配器使用 API key：请在 shell 中设置 ${config.backends.dsh.api_key_env}，或通过 DSH 官方流程配置 ${config.backends.dsh.credentials ?? credentialsPath()}。本工具不接收或打印密钥。` : '此插件未声明官方交互登录入口；请按适配器文档配置环境变量。', false, '连接模型后端'); }
+    else if (action === 'login') { if (!id || !config.backends[id]) throw invalid('用法：auth login <已注册后端>'); print(id === 'dsh' ? `DSH 适配器使用 API key：请在 shell 中设置 ${config.backends.dsh.api_key_env}，或通过 DSH 官方流程配置 ${config.backends.dsh.credentials ?? credentialsPath()}。本工具不接收或打印密钥。` : id === 'codex' ? codexLogin(config.backends.codex.binary) : '此插件未声明官方交互登录入口；请按适配器文档配置环境变量。', false, '连接模型后端'); }
     else throw invalid('用法：auth status [backend] | auth login <backend>'); return 0;
   }
   if (mode === 'sessions') return sessionsCommand(argv);

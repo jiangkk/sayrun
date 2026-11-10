@@ -30,10 +30,10 @@ export function notice(text: string, tone: Tone = 'muted') { report(tone === 're
 
 const labels: Record<string, string> = {
   config: '配置', sources: '配置来源', warnings: '提醒', diagnostics: '检查结果', auth: '认证',
-  version: '版本', node: 'Node.js', bun: 'Bun', opentui: 'OpenTUI', protocol: '适配器协议', adapter: '当前适配器', backend: '后端',
+  version: '版本', node: 'Node.js', bun: 'Bun', opentui: 'OpenTUI', protocol: '适配器协议', adapter: '当前适配器', backend: 'Agent', engine: 'Agent 工具',
   available: '可用', capabilities: '能力', path: '路径', backup: '备份', changed: '已更改', valid: '配置有效',
-  key: '配置项', value: '值', source: '来源', status: '状态', note: '说明', default: '默认后端',
-  userDefault: '用户默认后端', effective: '当前生效后端', trusted: '已信任', id: '名称', apiVersion: 'API 版本',
+  key: '配置项', value: '值', source: '来源', status: '状态', note: '说明', default: '默认 Agent',
+  trusted: '已信任', id: '名称', apiVersion: 'API 版本',
   nativeHome: '后端运行目录', probe: '后端信息', current: '当前版本', latest: '最新版本',
   title: '标题', sessionId: '会话 ID', project: '项目', cwd: '目录', model: '模型', commands: '命令数',
   createdAt: '创建时间', updatedAt: '更新时间', pinned: '置顶', archived: '已归档', resume: '恢复方式', readOnly: '只读',

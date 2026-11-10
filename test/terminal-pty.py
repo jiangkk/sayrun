@@ -5,6 +5,7 @@ import faulthandler
 import pty
 import select
 import signal
+import shutil
 import tempfile
 import time
 
@@ -21,8 +22,21 @@ def run_case(mode, ui_mode):
             os.makedirs(config_dir)
             with open(os.path.join(config_dir, "config.toml"), "w") as config:
                 config.write('[agent]\nmax_steps=1\n')
+        if mode == "codex":
+            binary = os.path.join(runtime, "codex")
+            shutil.copyfile(os.path.join(root, "test", "fixture-codex.mjs"), binary)
+            os.chmod(binary, 0o700)
+            config_dir = os.path.join(env["TA_HOME"], "config")
+            os.makedirs(config_dir)
+            with open(os.path.join(config_dir, "config.toml"), "w") as config:
+                config.write(f'[backends.codex]\nbinary="{binary}"\n')
+            env.update(SAYRUN_TEST_CODEX_MODE="pty", SAYRUN_TEST_PROJECT=root)
         if mode == "setup":
             env["ZDOTDIR"] = runtime
+            # setup starts zsh without -f; keep runner-wide completion setup
+            # out of this test while still loading our temporary .zshrc.
+            with open(os.path.join(runtime, ".zshenv"), "w") as config:
+                config.write("unsetopt GLOBAL_RCS\n")
             os.mkdir(os.path.join(runtime, "bin"))
             os.symlink(os.path.join(root, "dist", "sayrun.js"), os.path.join(runtime, "bin", "sayrun"))
             env["PATH"] = os.path.join(runtime, "bin") + os.pathsep + env["PATH"]
@@ -64,7 +78,7 @@ def run_case(mode, ui_mode):
 
         try:
             if mode == "setup":
-                send("PS1='TEST_PROMPT> '; sayrun setup\n")
+                send("PS1='TEST_PROMPT> '; sayrun setup --engine dsh\n")
                 until("授权模式 [1/2/3，默认 1]：")
                 send("1\n")
                 until("应用以上配置？ [y/N]")
@@ -72,15 +86,15 @@ def run_case(mode, ui_mode):
                 until("TEST_PROMPT> ")
                 with open(os.path.join(runtime, ".zshrc")) as config:
                     assert "sayrun" not in config.read()
-                send("sayrun setup\n")
+                send("sayrun setup --engine dsh\n")
                 until("授权模式 [1/2/3，默认 1]：")
                 send("\x03")
                 until("TEST_PROMPT> ")
-                send("sayrun setup --yes\n")
+                send("sayrun setup --engine dsh --yes\n")
                 until("正在进入已启用 Sayrun 的新 zsh")
                 until("sayrun 已启用")
                 until("SETUP_PROMPT> ")
-                send("typeset setup_shell_pid=$$; sayrun shell off; sayrun setup\n")
+                send("typeset setup_shell_pid=$$; sayrun shell off; sayrun setup --engine dsh\n")
                 until("授权模式 [1/2/3，默认 1]：")
                 send("1\n")
                 until("应用以上配置？ [y/N]")
@@ -89,7 +103,13 @@ def run_case(mode, ui_mode):
                 send("sayrun shell status\n")
                 until("enabled=0")
                 until("SETUP_PROMPT> ")
-                send("sayrun setup --yes\n")
+                send("TERMINAL_AGENT_DSH_BIN=/example/missing-dsh sayrun setup --engine dsh --yes\n")
+                until("未找到可用的 Agent")
+                until("SETUP_PROMPT> ")
+                send("sayrun shell status\n")
+                until("enabled=0")
+                until("SETUP_PROMPT> ")
+                send("sayrun setup --engine dsh --yes\n")
                 until("sayrun 已启用")
                 until("SETUP_PROMPT> ")
                 send("[[ $$ == $setup_shell_pid ]] && printf 'SAME_%s\\n' SHELL\n")
@@ -114,6 +134,14 @@ def run_case(mode, ui_mode):
             send(startup + "source ./shell/sayrun.zsh\n")
             until("sayrun 已启用")
             until("TEST_PROMPT> ")
+            if mode == "codex":
+                send('sayrun ask --engine codex --ephemeral "检查测试输出"\n')
+                until("执行？[Y/n/q]")
+                send("y\n")
+                until("fixture done")
+                until("TEST_PROMPT> ")
+                send("exit\n")
+                return
             if mode == "reload":
                 for iteration in range(3):
                     send("sayrun-off\n")
@@ -255,6 +283,8 @@ for ui_mode in ("plain", "tui"):
     for case in ("approve", "default-approve", "deny", "cancel", "question", "question-cancel", "classify", "max-tokens", "backend-error", "budget-summary"):
         run_case(case, ui_mode)
         print("PASS:", ui_mode, case, flush=True)
+run_case("codex", "plain")
+print("PASS: built CLI runs Codex through Sayrun approval in a PTY", flush=True)
 run_case("edit", "tui")
 print("PASS: tui select edit, Shift-Enter newline, Enter executes directly", flush=True)
 if os.path.exists(os.path.expanduser("~/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh")):

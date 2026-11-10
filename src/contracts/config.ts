@@ -5,7 +5,7 @@ export interface BackendSettings {
 }
 export interface Config {
   schema_version: number;
-  agent: { backend: string; max_commands: number; max_steps: number; max_questions: number; active_timeout_seconds: number };
+  agent: { engine: string; max_commands: number; max_steps: number; max_questions: number; active_timeout_seconds: number };
   routing: { mode: 'auto' | 'local' | 'explicit'; classifier: string; confidence_threshold: number; timeout_seconds: number; on_ambiguous: 'ask' };
   ui: { mode: 'opentui' | 'plain'; language: string; color: 'auto' | 'always' | 'never'; output_preview_lines: number };
   approval: { mode: ApprovalMode; default_selection: 'approve' | 'reject' | 'edit'; editor_enter: 'execute' | 'save' };
