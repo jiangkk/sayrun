@@ -6,6 +6,7 @@ import pty
 import select
 import signal
 import shutil
+import sys
 import tempfile
 import time
 
@@ -17,6 +18,9 @@ def run_case(mode, ui_mode):
         env = dict(os.environ, TERM="xterm-256color", TA_HOME=os.path.join(runtime, "product"), TERMINAL_AGENT_HOME=runtime, TERMINAL_AGENT_UI=ui_mode,
                    TERMINAL_AGENT_FIXTURE_SCENARIO={"question": "question", "question-cancel": "question", "max-tokens": "max-tokens", "backend-error": "malformed-after-execution", "budget-summary": "budget-summary"}.get(mode, ""),
                    TERMINAL_AGENT_DSH_BIN=os.path.join(root, "test", "fixture-dsh.mjs"))
+        if mode == "conversation" and sys.platform == "linux":
+            # glibc rejects the old Han regex range in this common UTF-8 locale.
+            env["LC_ALL"] = "C.UTF-8"
         if mode == "budget-summary":
             config_dir = os.path.join(env["TA_HOME"], "config")
             os.makedirs(config_dir)
@@ -248,6 +252,8 @@ def run_case(mode, ui_mode):
                     until("执行？[Y/n/q]")
                     send("y\n")
                 until("NATIVE_TURN_2")
+                assert b"Invalid collation character" not in transcript
+                assert "正在识别输入意图".encode() not in transcript
                 until("FINAL_ANSWER_END")
                 until("TEST_PROMPT> ")
             # shell remains usable and widget restoration works.

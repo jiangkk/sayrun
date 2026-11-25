@@ -54,7 +54,13 @@ export async function manage(mode: string, argv: string[]) {
     print({ path: plan.path, change: plan.before !== plan.after ? '仅移除 sayrun 标记区块；保留配置与历史' : '无需更改' }, false, '卸载 Shell 集成');
     if (!opts['dry-run'] && (opts.yes || await confirm('应用以上更改？'))) print(await applyShellPlan(plan), false, '卸载结果'); return 0;
   }
-  if (mode === 'route-mode') { arity(argv, 0); write((await loadConfig()).config.routing.mode + '\n'); return 0; }
+  if (mode === 'route-mode') {
+    arity(argv, 0, 1);
+    const routingMode = (await loadConfig()).config.routing.mode;
+    // JavaScript matches Unicode code points independently of the shell locale.
+    const route = routingMode !== 'explicit' && /[一-龥]/u.test(argv[0] ?? '') ? 'agent' : routingMode;
+    write(route + '\n'); return 0;
+  }
   if (mode === 'version') {
     const { opts, args } = options(argv, { flags: ['json'] }); arity(args, 0);
     const loaded = await loadConfig(); let backend; try { backend = await createBackend(loaded.config).probe(); } catch (e) { backend = { available: false, diagnostics: [e.message] }; }

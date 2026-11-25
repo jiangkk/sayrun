@@ -41,10 +41,10 @@ function _terminal_agent_route() {
   case "$first" in
     if|then|else|elif|fi|for|while|until|do|done|case|esac|select|repeat|function|time|coproc|nocorrect|noglob) return ;;
   esac
-  if [[ "$line" =~ '[一-龥]' || "$line" =~ '^(please|help|show|check|list|explain|create|remove|delete|move|rename|why|how|what|can|could|fix|帮|请)' ]]; then
+  if [[ "$line" =~ '^(please|help|show|check|list|explain|create|remove|delete|move|rename|why|how|what|can|could|fix|帮|请)' ]]; then
     REPLY=agent
   else
-    REPLY=classify
+    REPLY=detect-han
   fi
 }
 
@@ -67,11 +67,18 @@ function _terminal_agent_accept_line() {
     zle _terminal_agent_original_accept_line
     return
   fi
+  # Reuse the config lookup to detect Han without a locale-dependent zsh range
+  # or an extra Node process. Known ambiguous shell commands still classify.
   local routing_mode
-  routing_mode=$("$TERMINAL_AGENT_NODE" "$TERMINAL_AGENT_ROOT/dist/sayrun.js" route-mode </dev/null)
+  local -a route_args=()
+  [[ "$REPLY" == detect-han ]] && route_args=("$line")
+  routing_mode=$("$TERMINAL_AGENT_NODE" "$TERMINAL_AGENT_ROOT/dist/sayrun.js" route-mode "${route_args[@]}" </dev/null)
   if [[ "$routing_mode" == explicit ]]; then
     zle _terminal_agent_original_accept_line
     return
+  fi
+  if [[ "$REPLY" == detect-han ]]; then
+    if [[ "$routing_mode" == agent ]]; then REPLY=agent; else REPLY=classify; fi
   fi
   zle -I
   if [[ "$REPLY" == classify ]]; then

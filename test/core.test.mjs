@@ -101,7 +101,8 @@ test('zsh routes native syntax, aliases, functions, Chinese args and natural lan
     ['if true; then', 'shell'], ['echo first\necho second', 'shell'],
     ['!123', 'shell'], ['$(echo pwd)', 'shell'], ['# comment', 'shell'],
     ['ll', 'shell'], ['myfunc arg', 'shell'], ['帮我找最大的文件', 'agent'],
-    ['please find large files', 'agent'], ['find largest files', 'classify'], ['gti statsu', 'classify'],
+    ['please find large files', 'agent'], ['find largest files', 'classify'],
+    ['gti statsu', 'detect-han'], ['根据刚才的结果继续检查', 'detect-han'],
     ['git 帮我撤销上一次提交', 'classify'], ['  git status', 'shell'], ['echo 帮我', 'shell'],
     ['echo "帮我"', 'shell'], ['grep 中文 file.txt', 'shell'],
   ];

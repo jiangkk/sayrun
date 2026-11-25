@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { homedir } from 'node:os';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArguments } from '../src/cli/main.ts';
 import { runtimeHome, credentialsPath, packageRoot } from '../src/platform/paths.ts';
@@ -39,6 +40,25 @@ test('help/version work without DSH and non-TTY input fails without starting a t
   assert.match(run().stdout, /交互需要终端/);
   assert.equal(run('doctor').status, 5);
   assert.match(run('doctor').stdout, /无法运行 dsh/);
+});
+
+test('route-mode detects Han locally without overriding explicit routing', (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'sayrun-route-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  mkdirSync(join(home, 'config'));
+  const env = { ...process.env, TA_HOME: home, LC_ALL: 'C' };
+  const run = (...args) => {
+    const result = spawnSync(process.execPath, [join(packageRoot, 'dist/sayrun.js'), 'route-mode', ...args], { cwd: home, env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  for (const mode of ['auto', 'local', 'explicit']) {
+    writeFileSync(join(home, 'config', 'config.toml'), `[routing]\nmode="${mode}"\n`);
+    assert.equal(run(), mode);
+    assert.equal(run('gti statsu'), mode);
+    assert.equal(run('café 😀'), mode);
+    assert.equal(run('根据刚才的结果继续检查'), mode === 'explicit' ? 'explicit' : 'agent');
+  }
 });
 
 test('zsh init is deterministic and preserves an existing ta function or alias', () => {
