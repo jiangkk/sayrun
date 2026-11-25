@@ -22,7 +22,7 @@ Sayrun (`sayrun-shell`) is an AI terminal assistant for zsh, powered by your ins
 
 Sayrun 将 DSH 或 Codex 接入日常 shell 操作。默认使用 DSH，并复用其已有认证。
 
-当前为 0.1.x 早期版本，已在 macOS / Apple Silicon 验证。欢迎试用和反馈；平台、后端及执行边界见下文和 [安全说明](SECURITY.md)。
+Sayrun 仍处于早期开发阶段，已在 macOS / Apple Silicon 验证。欢迎试用和反馈；平台、后端及执行边界见下文和 [安全说明](SECURITY.md)。
 
 ## 效果预览
 

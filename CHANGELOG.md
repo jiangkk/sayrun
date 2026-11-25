@@ -2,11 +2,22 @@
 
 ## 未发布
 
-- 移除独立的 `backend` 命令。使用 `setup` 检测并选择 Agent，使用 `config set agent.engine <name>` 切换默认 Agent，使用 `doctor --engine <name>` 检查指定工具。
 - 同一 zsh 实例、项目和后端中的连续提问复用会话；普通命令与集成重新加载不会切断对话，`ask --new` 可开始新会话。
 - DSH 通过原生 session 恢复上下文，恢复失败明确报错；可显式使用 `--context-only` 创建可见历史分支。
 - 使用 MIT 许可证，补充贡献、安全与发布文档；清理测试中的业务信息，提供不带旧 Git 历史的源码导出。
 - 增加 macOS / Linux CI、历史密钥扫描和主仓库静态官网部署配置。
+
+## 0.2.0-beta.2（2026-11-25）
+
+- 修复 Linux `C.UTF-8` 环境下的中文追问路由。zsh 的自动路由按 Unicode 识别汉字，避免触发不必要的意图分类。
+- 已在 macOS / Apple Silicon 完成终端回归。Codex 和 DSH 的原生会话续接使用本机 CLI 和回环模型替身验证。
+
+## 0.2.0-beta.1（2026-11-10）
+
+- 实验性接入 Codex CLI，支持 Sayrun 命令审批、原生会话续接与临时任务。Codex 使用独立的登录目录。
+- `setup` 在写配置前检测 DSH 和 Codex，提供选择、安装指引和重新检测。用户配置可通过 `config init` 补齐默认字段。
+- 使用 `agent.engine` 配置默认 Agent，读取时兼容旧配置键和旧会话。移除独立的 `backend` 命令。使用 `config set agent.engine <name>` 切换，使用 `doctor --engine <name>` 检查。
+- Codex 接入已在 macOS / Apple Silicon 使用本机 CLI 和回环模型替身验证，真实账号登录和在线模型调用待验证。
 
 ## 0.1.7（2026-10-27）
 
